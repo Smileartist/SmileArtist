@@ -236,8 +236,8 @@ export function TalkingBuddy() {
     return (
       <div className="max-w-4xl mx-auto">
         <div className="mb-6 md:mb-8">
-          <h2 className="text-[#2d2424] mb-2">Talking Buddy</h2>
-          <p className="text-[#8a7c74] text-sm md:text-base">
+          <h2 className="mb-2" style={{ color: 'var(--theme-text)' }}>Talking Buddy</h2>
+          <p className="text-sm md:text-base" style={{ color: 'var(--theme-text)', opacity: 0.7 }}>
             A safe space to share your thoughts with someone who cares. Connect anonymously for support.
           </p>
         </div>
@@ -251,64 +251,66 @@ export function TalkingBuddy() {
           </Alert>
         )}
 
-        <Alert className="mb-6 md:mb-8 border-[#d4a76f]/30 bg-[#fce4da]/50 rounded-xl">
-          <Heart className="h-4 w-4 text-[#d4756f]" />
-          <AlertDescription className="text-[#5a4f48] text-sm">
+        <Alert className="mb-6 md:mb-8 rounded-xl border" style={{ borderColor: 'var(--theme-primary)', backgroundColor: 'var(--theme-accent)' }}>
+          <Heart className="h-4 w-4" style={{ color: 'var(--theme-primary)' }} />
+          <AlertDescription className="text-sm" style={{ color: 'var(--theme-text)' }}>
             If you're experiencing a crisis, please contact a professional helpline. This is peer support, not professional therapy.
           </AlertDescription>
         </Alert>
 
         <div className="grid md:grid-cols-2 gap-4 md:gap-6">
-          <Card className="p-6 md:p-8 border-2 border-[#a8c9a3]/30 hover:border-[#a8c9a3] transition-all bg-white/80 backdrop-blur-sm rounded-2xl hover:shadow-lg">
-            <div className="flex items-center justify-center w-14 h-14 md:w-16 md:h-16 rounded-full bg-[#a8c9a3]/20 mb-4 md:mb-6 mx-auto">
-              <UserPlus className="w-7 h-7 md:w-8 md:h-8 text-[#6b9865]" />
+          <Card className="p-6 md:p-8 border-2 transition-all backdrop-blur-sm rounded-2xl hover:shadow-lg" style={{ borderColor: 'var(--theme-primary)', backgroundColor: 'var(--theme-card-bg)', opacity: 0.9 }}>
+            <div className="flex items-center justify-center w-14 h-14 md:w-16 md:h-16 rounded-full mb-4 md:mb-6 mx-auto" style={{ backgroundColor: 'var(--theme-accent)' }}>
+              <UserPlus className="w-7 h-7 md:w-8 md:h-8" style={{ color: 'var(--theme-primary)' }} />
             </div>
-            <h3 className="text-center text-[#2d2424] mb-2 md:mb-3">Be a Listener</h3>
-            <p className="text-center text-[#8a7c74] text-sm md:text-base mb-4 md:mb-6">
+            <h3 className="text-center mb-2 md:mb-3" style={{ color: 'var(--theme-text)' }}>Be a Listener</h3>
+            <p className="text-center text-sm md:text-base mb-4 md:mb-6" style={{ color: 'var(--theme-text)', opacity: 0.7 }}>
               Offer support and lend an ear to someone who needs it. Your kindness can make a difference.
             </p>
             <Button
               onClick={() => startConnection("listener")}
-              className="w-full bg-gradient-to-r from-[#a8c9a3] to-[#8fb896] hover:from-[#92b88d] hover:to-[#7da584] text-white shadow-md rounded-xl"
+              className="w-full shadow-md rounded-xl"
+              style={{ background: `linear-gradient(to right, var(--theme-primary), var(--theme-secondary))`, color: 'white' }}
             >
               Start Listening
             </Button>
           </Card>
 
-          <Card className="p-6 md:p-8 border-2 border-[#8fb5c9]/30 hover:border-[#8fb5c9] transition-all bg-white/80 backdrop-blur-sm rounded-2xl hover:shadow-lg">
-            <div className="flex items-center justify-center w-14 h-14 md:w-16 md:h-16 rounded-full bg-[#8fb5c9]/20 mb-4 md:mb-6 mx-auto">
-              <MessageCircle className="w-7 h-7 md:w-8 md:h-8 text-[#6a94a8]" />
+          <Card className="p-6 md:p-8 border-2 transition-all backdrop-blur-sm rounded-2xl hover:shadow-lg" style={{ borderColor: 'var(--theme-primary)', backgroundColor: 'var(--theme-card-bg)', opacity: 0.9 }}>
+            <div className="flex items-center justify-center w-14 h-14 md:w-16 md:h-16 rounded-full mb-4 md:mb-6 mx-auto" style={{ backgroundColor: 'var(--theme-accent)' }}>
+              <MessageCircle className="w-7 h-7 md:w-8 md:h-8" style={{ color: 'var(--theme-primary)' }} />
             </div>
-            <h3 className="text-center text-[#2d2424] mb-2 md:mb-3">Find a Listener</h3>
-            <p className="text-center text-[#8a7c74] text-sm md:text-base mb-4 md:mb-6">
+            <h3 className="text-center mb-2 md:mb-3" style={{ color: 'var(--theme-text)' }}>Find a Listener</h3>
+            <p className="text-center text-sm md:text-base mb-4 md:mb-6" style={{ color: 'var(--theme-text)', opacity: 0.7 }}>
               Feeling low or need to talk? Connect with someone who's here to listen without judgment.
             </p>
             <Button
               onClick={() => startConnection("seeker")}
-              className="w-full bg-gradient-to-r from-[#8fb5c9] to-[#7ca4b8] hover:from-[#7ca4b8] hover:to-[#6993a7] text-white shadow-md rounded-xl"
+              className="w-full shadow-md rounded-xl"
+              style={{ background: `linear-gradient(to right, var(--theme-primary), var(--theme-secondary))`, color: 'white' }}
             >
               Talk to Someone
             </Button>
           </Card>
         </div>
 
-        <div className="mt-6 md:mt-8 p-4 md:p-6 bg-gradient-to-br from-[#fce4da]/50 to-[#f5e8e0]/50 rounded-2xl border border-[#d4756f]/10">
-          <h3 className="text-[#2d2424] mb-3 md:mb-4">Guidelines</h3>
-          <ul className="space-y-2 text-[#8a7c74] text-sm md:text-base">
+        <div className="mt-6 md:mt-8 p-4 md:p-6 rounded-2xl border" style={{ background: `linear-gradient(to bottom right, var(--theme-accent), var(--theme-accent))`, borderColor: 'var(--theme-primary)' }}>
+          <h3 className="mb-3 md:mb-4" style={{ color: 'var(--theme-text)' }}>Guidelines</h3>
+          <ul className="space-y-2 text-sm md:text-base" style={{ color: 'var(--theme-text)', opacity: 0.7 }}>
             <li className="flex items-start gap-2">
-              <span className="text-[#a8c9a3] mt-1">•</span>
+              <span className="mt-1" style={{ color: 'var(--theme-primary)' }}>•</span>
               <span>Be kind, respectful, and non-judgmental</span>
             </li>
             <li className="flex items-start gap-2">
-              <span className="text-[#a8c9a3] mt-1">•</span>
+              <span className="mt-1" style={{ color: 'var(--theme-primary)' }}>•</span>
               <span>Keep conversations anonymous and confidential</span>
             </li>
             <li className="flex items-start gap-2">
-              <span className="text-[#a8c9a3] mt-1">•</span>
+              <span className="mt-1" style={{ color: 'var(--theme-primary)' }}>•</span>
               <span>Listen actively and offer support, not advice</span>
             </li>
             <li className="flex items-start gap-2">
-              <span className="text-[#a8c9a3] mt-1">•</span>
+              <span className="mt-1" style={{ color: 'var(--theme-primary)' }}>•</span>
               <span>Report any concerning behavior or abuse</span>
             </li>
           </ul>
@@ -320,15 +322,15 @@ export function TalkingBuddy() {
   if (status === "waiting") {
     return (
       <div className="max-w-2xl mx-auto">
-        <Card className="p-8 md:p-12 text-center bg-white/80 backdrop-blur-sm border-[#d4756f]/20 rounded-2xl shadow-lg">
-          <Loader2 className="w-10 h-10 md:w-12 md:h-12 text-[#d4756f] animate-spin mx-auto mb-4 md:mb-6" />
-          <h3 className="text-[#2d2424] mb-2 md:mb-3">
+        <Card className="p-8 md:p-12 text-center backdrop-blur-sm rounded-2xl shadow-lg border" style={{ backgroundColor: 'var(--theme-card-bg)', opacity: 0.9, borderColor: 'var(--theme-primary)' }}>
+          <Loader2 className="w-10 h-10 md:w-12 md:h-12 animate-spin mx-auto mb-4 md:mb-6" style={{ color: 'var(--theme-primary)' }} />
+          <h3 className="mb-2 md:mb-3" style={{ color: 'var(--theme-text)' }}>
             {role === "listener" ? "Waiting for someone to connect..." : "Finding a listener for you..."}
           </h3>
-          <p className="text-[#8a7c74] text-sm md:text-base mb-4 md:mb-6">
+          <p className="text-sm md:text-base mb-4 md:mb-6" style={{ color: 'var(--theme-text)', opacity: 0.7 }}>
             This might take a moment. Thank you for your patience.
           </p>
-          <Button onClick={endConnection} variant="outline" className="border-[#d4756f]/30 text-[#d4756f] hover:bg-[#fce4da] rounded-xl">
+          <Button onClick={endConnection} variant="outline" className="rounded-xl border" style={{ borderColor: 'var(--theme-primary)', color: 'var(--theme-primary)', backgroundColor: 'transparent' }} onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--theme-accent)'} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}>
             Cancel
           </Button>
         </Card>
@@ -338,29 +340,29 @@ export function TalkingBuddy() {
 
   return (
     <div className="max-w-4xl mx-auto md:pt-0 -mt-16 md:mt-0 -mx-4 md:mx-auto h-screen md:h-auto">
-      <Card className="border border-[#d4756f]/20 bg-white/80 backdrop-blur-sm md:rounded-2xl shadow-lg overflow-hidden h-full md:h-auto flex flex-col">
-        <div className="border-b border-[#d4756f]/20 p-3 md:p-4 flex items-center justify-between bg-gradient-to-r from-[#fce4da]/30 to-[#f5e8e0]/30 flex-shrink-0">
+      <Card className="border backdrop-blur-sm md:rounded-2xl shadow-lg overflow-hidden h-full md:h-auto flex flex-col" style={{ borderColor: 'var(--theme-primary)', backgroundColor: 'var(--theme-card-bg)', opacity: 0.9 }}>
+        <div className="border-b p-3 md:p-4 flex items-center justify-between flex-shrink-0" style={{ borderColor: 'var(--theme-primary)', background: `linear-gradient(to right, var(--theme-accent), var(--theme-accent))`, opacity: 0.3 }}>
           <div className="flex items-center gap-2 md:gap-3">
-            <div className="w-2.5 h-2.5 md:w-3 md:h-3 bg-[#a8c9a3] rounded-full animate-pulse"></div>
+            <div className="w-2.5 h-2.5 md:w-3 md:h-3 rounded-full animate-pulse" style={{ backgroundColor: 'var(--theme-primary)' }}></div>
             <div>
-              <h3 className="text-[#2d2424] text-sm md:text-base">
+              <h3 className="text-sm md:text-base" style={{ color: 'var(--theme-text)' }}>
                 {role === "listener" ? "Supporting Someone" : "Talking with a Listener"}
               </h3>
-              <p className="text-xs md:text-sm text-[#8a7c74]">
+              <p className="text-xs md:text-sm" style={{ color: 'var(--theme-text)', opacity: 0.7 }}>
                 Anonymous conversation
               </p>
             </div>
           </div>
-          <Button onClick={endConnection} variant="ghost" size="icon" className="h-8 w-8 md:h-10 md:w-10 hover:bg-[#fce4da] text-[#d4756f]">
+          <Button onClick={endConnection} variant="ghost" size="icon" className="h-8 w-8 md:h-10 md:w-10" style={{ color: 'var(--theme-primary)' }} onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--theme-accent)'} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}>
             <X className="w-4 h-4 md:w-5 md:h-5" />
           </Button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-3 md:space-y-4 bg-gradient-to-b from-white/50 to-[#fef9f5]/30">
+        <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-3 md:space-y-4" style={{ background: `linear-gradient(to bottom, var(--theme-card-bg), var(--theme-background))`, opacity: 0.5 }}>
           {messages.length === 0 && (
             <div className="text-center py-8 md:py-12">
-              <MessageCircle className="w-10 h-10 md:w-12 md:h-12 text-[#d4756f]/30 mx-auto mb-2 md:mb-3" />
-              <p className="text-[#8a7c74] text-sm md:text-base">Start the conversation...</p>
+              <MessageCircle className="w-10 h-10 md:w-12 md:h-12 mx-auto mb-2 md:mb-3" style={{ color: 'var(--theme-primary)', opacity: 0.3 }} />
+              <p className="text-sm md:text-base" style={{ color: 'var(--theme-text)', opacity: 0.7 }}>Start the conversation...</p>
             </div>
           )}
           {messages.map((message) => {
@@ -414,15 +416,15 @@ export function TalkingBuddy() {
 
         {/* Friend Request Notifications */}
         {!friendsAdded && friendRequestReceived && (
-          <Alert className="mx-4 mb-3 border-[#a8c9a3] bg-[#a8c9a3]/10 rounded-xl">
-            <Heart className="h-4 w-4 text-[#6b9865]" />
-            <AlertDescription className="text-[#2d2424] text-sm flex items-center justify-between">
+          <Alert className="mx-4 mb-3 rounded-xl border" style={{ borderColor: 'var(--theme-primary)', backgroundColor: 'var(--theme-accent)' }}>
+            <Heart className="h-4 w-4" style={{ color: 'var(--theme-primary)' }} />
+            <AlertDescription className="text-sm flex items-center justify-between" style={{ color: 'var(--theme-text)' }}>
               <span>Your chat partner wants to stay connected!</span>
               <div className="flex gap-2 ml-2">
-                <Button onClick={acceptFriendRequest} size="sm" className="bg-[#a8c9a3] hover:bg-[#92b88d] text-white rounded-lg h-7 text-xs">
+                <Button onClick={acceptFriendRequest} size="sm" className="rounded-lg h-7 text-xs text-white" style={{ backgroundColor: 'var(--theme-primary)' }} onMouseEnter={(e) => e.currentTarget.style.opacity = '0.9'} onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}>
                   Accept
                 </Button>
-                <Button onClick={declineFriendRequest} size="sm" variant="outline" className="border-[#d4756f]/30 text-[#d4756f] hover:bg-[#fce4da] rounded-lg h-7 text-xs">
+                <Button onClick={declineFriendRequest} size="sm" variant="outline" className="rounded-lg h-7 text-xs border" style={{ borderColor: 'var(--theme-primary)', color: 'var(--theme-primary)', backgroundColor: 'transparent' }} onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--theme-accent)'} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}>
                   Decline
                 </Button>
               </div>
@@ -432,7 +434,7 @@ export function TalkingBuddy() {
 
         {!friendsAdded && friendRequestSent && (
           <div className="px-4 pb-3">
-            <p className="text-xs text-[#8a7c74] text-center">
+            <p className="text-xs text-center" style={{ color: 'var(--theme-text)', opacity: 0.7 }}>
               Friend request sent. Waiting for response...
             </p>
           </div>
@@ -444,7 +446,10 @@ export function TalkingBuddy() {
               onClick={sendFriendRequest}
               variant="outline"
               size="sm"
-              className="w-full border-[#a8c9a3] text-[#6b9865] hover:bg-[#a8c9a3]/10 rounded-xl"
+              className="w-full rounded-xl"
+              style={{ borderColor: 'var(--theme-primary)', color: 'var(--theme-primary)', backgroundColor: 'transparent' }}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--theme-accent)'}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
             >
               <UserPlus className="w-4 h-4 mr-2" />
               Save Chat & Stay Connected
@@ -452,7 +457,7 @@ export function TalkingBuddy() {
           </div>
         )}
 
-        <div className="border-t border-[#d4756f]/20 p-3 md:p-4 bg-gradient-to-r from-[#fce4da]/30 to-[#f5e8e0]/30 flex-shrink-0">
+        <div className="border-t p-3 md:p-4 flex-shrink-0" style={{ borderColor: 'var(--theme-primary)', background: `linear-gradient(to right, var(--theme-accent), var(--theme-accent))`, opacity: 0.3 }}>
           <div className="flex gap-2">
             <Input
               type="text"
@@ -460,13 +465,14 @@ export function TalkingBuddy() {
               value={inputMessage}
               onChange={(e) => setInputMessage(e.target.value)}
               onKeyPress={(e) => e.key === "Enter" && sendMessage()}
-              className="flex-1 text-sm md:text-base border-[#d4756f]/20 bg-white/80 rounded-xl focus:border-[#d4756f]"
+              className="flex-1 text-sm md:text-base rounded-xl"
+              style={{ borderColor: 'var(--theme-primary)', backgroundColor: 'var(--theme-card-bg)', color: 'var(--theme-text)' }}
             />
-            <Button onClick={sendMessage} className="bg-gradient-to-r from-[#d4756f] to-[#c9a28f] hover:from-[#c9675f] hover:to-[#b89280] h-9 w-9 md:h-10 md:w-10 rounded-xl shadow-md">
+            <Button onClick={sendMessage} className="h-9 w-9 md:h-10 md:w-10 rounded-xl shadow-md" style={{ background: `linear-gradient(to right, var(--theme-primary), var(--theme-secondary))`, color: 'white' }}>
               <Send className="w-4 h-4" />
             </Button>
           </div>
-          <p className="text-[10px] md:text-xs text-[#8a7c74] mt-2">
+          <p className="text-[10px] md:text-xs mt-2" style={{ color: 'var(--theme-text)', opacity: 0.7 }}>
             Remember: Be respectful and supportive. This is a safe space for everyone.
           </p>
         </div>

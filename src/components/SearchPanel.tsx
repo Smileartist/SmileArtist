@@ -29,14 +29,15 @@ export function SearchPanel({ onClose }: SearchPanelProps) {
     <div 
       className="h-full backdrop-blur-sm max-w-2xl mx-auto"
       style={{
-        backgroundColor: 'rgba(255, 255, 255, 0.8)',
+        backgroundColor: 'var(--theme-card-bg)',
+        opacity: 0.9,
         borderRadius: 'var(--theme-border-radius)',
       }}
     >
       <div 
         className="sticky top-16 md:top-0 backdrop-blur-md border-b p-4 md:p-6 -mx-4 md:mx-0"
         style={{
-          background: `linear-gradient(to right, rgba(255,255,255,0.9), var(--theme-accent))`,
+          background: `linear-gradient(to right, var(--theme-card-bg), var(--theme-accent))`,
           borderColor: `var(--theme-primary)33`,
           borderRadius: `var(--theme-border-radius) var(--theme-border-radius) 0 0`,
         }}
@@ -64,10 +65,12 @@ export function SearchPanel({ onClose }: SearchPanelProps) {
             placeholder="Search poetry, writers, topics..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 bg-white/50"
+            className="pl-10"
             style={{
-              borderColor: `var(--theme-primary)33`,
+              backgroundColor: 'var(--theme-card-bg)',
+              borderColor: `var(--theme-primary)`,
               borderRadius: 'var(--theme-border-radius)',
+              color: 'var(--theme-text)',
             }}
           />
         </div>
@@ -82,7 +85,7 @@ export function SearchPanel({ onClose }: SearchPanelProps) {
                 key={index}
                 className="w-full flex items-center justify-between p-3 transition-all text-left"
                 style={{ borderRadius: 'var(--theme-border-radius)' }}
-                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = `var(--theme-accent)80`}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--theme-accent)'}
                 onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
               >
                 <div>

@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, useRef, ReactNode } from "react";
 
 export interface ThemeConfig {
   // Colors
@@ -46,10 +46,45 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
+  const darkModeInitialized = useRef(false);
+
+  // Initialize dark mode synchronously before any rendering (only once)
+  if (typeof window !== 'undefined' && !darkModeInitialized.current) {
+    const darkMode = localStorage.getItem("app_darkMode") === "true";
+    const root = document.documentElement;
+    if (darkMode) {
+      root.classList.add('dark');
+    } else {
+      root.classList.remove('dark');
+    }
+    darkModeInitialized.current = true;
+  }
+
   const [theme, setTheme] = useState<ThemeConfig>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem("smileArtistTheme");
-      return saved ? JSON.parse(saved) : defaultTheme;
+      const savedTheme = saved ? JSON.parse(saved) : defaultTheme;
+      
+      // If dark mode is enabled and theme matches default light, apply dark colors
+      const darkMode = localStorage.getItem("app_darkMode") === "true";
+      if (darkMode) {
+        const isDefaultLight = 
+          savedTheme.backgroundColor === defaultTheme.backgroundColor &&
+          savedTheme.textColor === defaultTheme.textColor &&
+          savedTheme.accentColor === defaultTheme.accentColor &&
+          savedTheme.chatOtherMessageBg === defaultTheme.chatOtherMessageBg;
+        
+        if (isDefaultLight) {
+          return {
+            ...savedTheme,
+            backgroundColor: "#1a1515",
+            textColor: "#f5e8e0",
+            accentColor: "#3d2f2f",
+            chatOtherMessageBg: "#2d2424",
+          };
+        }
+      }
+      return savedTheme;
     }
     return defaultTheme;
   });
@@ -89,6 +124,9 @@ function applyThemeToDocument(theme: ThemeConfig) {
   
   const root = document.documentElement;
   
+  // Check dark mode state first
+  const isDark = root.classList.contains('dark');
+  
   // Apply CSS variables
   root.style.setProperty("--theme-primary", theme.primaryColor);
   root.style.setProperty("--theme-secondary", theme.secondaryColor);
@@ -102,7 +140,5 @@ function applyThemeToDocument(theme: ThemeConfig) {
   root.style.setProperty("--theme-chat-other-bg", theme.chatOtherMessageBg);
   
   // Set card background based on whether we're in dark mode
-  // Check if background is dark (assuming dark backgrounds have low luminance)
-  const isDark = root.classList.contains('dark');
   root.style.setProperty("--theme-card-bg", isDark ? "#2d2424" : "#ffffff");
 }

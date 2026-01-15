@@ -120,26 +120,29 @@ export function ChatList() {
   if (selectedChat) {
     return (
       <div className="max-w-4xl mx-auto md:pt-0 -mt-16 md:mt-0 -mx-4 md:mx-auto h-screen md:h-auto">
-        <Card className="border border-[#d4756f]/20 bg-white/80 backdrop-blur-sm md:rounded-2xl shadow-lg overflow-hidden h-full md:h-auto flex flex-col">
-          <div className="border-b border-[#d4756f]/20 p-3 md:p-4 flex items-center justify-between bg-gradient-to-r from-[#fce4da]/30 to-[#f5e8e0]/30 flex-shrink-0">
+        <Card className="border backdrop-blur-sm md:rounded-2xl shadow-lg overflow-hidden h-full md:h-auto flex flex-col" style={{ borderColor: 'var(--theme-primary)', backgroundColor: 'var(--theme-card-bg)', opacity: 0.9 }}>
+          <div className="border-b p-3 md:p-4 flex items-center justify-between flex-shrink-0" style={{ borderColor: 'var(--theme-primary)', background: `linear-gradient(to right, var(--theme-accent), var(--theme-accent))`, opacity: 0.3 }}>
             <div className="flex items-center gap-2 md:gap-3">
               <Button
                 onClick={() => setSelectedChat(null)}
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8 md:h-10 md:w-10 hover:bg-[#fce4da] text-[#d4756f]"
+                className="h-8 w-8 md:h-10 md:w-10"
+                style={{ color: 'var(--theme-primary)' }}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--theme-accent)'}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
               >
                 <ArrowLeft className="w-4 h-4 md:w-5 md:h-5" />
               </Button>
-              <div className="w-2.5 h-2.5 md:w-3 md:h-3 bg-[#a8c9a3] rounded-full"></div>
+              <div className="w-2.5 h-2.5 md:w-3 md:h-3 rounded-full" style={{ backgroundColor: 'var(--theme-primary)' }}></div>
               <div>
-                <h3 className="text-[#2d2424] text-sm md:text-base">Your Support Buddy</h3>
-                <p className="text-xs md:text-sm text-[#8a7c74]">Saved conversation</p>
+                <h3 className="text-sm md:text-base" style={{ color: 'var(--theme-text)' }}>Your Support Buddy</h3>
+                <p className="text-xs md:text-sm" style={{ color: 'var(--theme-text)', opacity: 0.7 }}>Saved conversation</p>
               </div>
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-3 md:space-y-4 bg-gradient-to-b from-white/50 to-[#fef9f5]/30">
+          <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-3 md:space-y-4" style={{ background: `linear-gradient(to bottom, var(--theme-card-bg), var(--theme-background))`, opacity: 0.5 }}>
             {selectedChat.messages.map((message) => {
               const isMe = message.sender === "me";
               const bubbleRadius = theme.chatBubbleStyle === "square" 
@@ -173,7 +176,7 @@ export function ChatList() {
             })}
           </div>
 
-          <div className="border-t border-[#d4756f]/20 p-3 md:p-4 bg-gradient-to-r from-[#fce4da]/30 to-[#f5e8e0]/30 flex-shrink-0">
+          <div className="border-t p-3 md:p-4 flex-shrink-0" style={{ borderColor: 'var(--theme-primary)', background: `linear-gradient(to right, var(--theme-accent), var(--theme-accent))`, opacity: 0.3 }}>
             <div className="flex gap-2">
               <Input
                 type="text"
@@ -181,16 +184,18 @@ export function ChatList() {
                 value={inputMessage}
                 onChange={(e) => setInputMessage(e.target.value)}
                 onKeyPress={(e) => e.key === "Enter" && sendMessage()}
-                className="flex-1 text-sm md:text-base border-[#d4756f]/20 bg-white/80 rounded-xl focus:border-[#d4756f]"
+                className="flex-1 text-sm md:text-base rounded-xl"
+                style={{ borderColor: 'var(--theme-primary)', backgroundColor: 'var(--theme-card-bg)', color: 'var(--theme-text)' }}
               />
               <Button
                 onClick={sendMessage}
-                className="bg-gradient-to-r from-[#d4756f] to-[#c9a28f] hover:from-[#c9675f] hover:to-[#b89280] h-9 w-9 md:h-10 md:w-10 rounded-xl shadow-md"
+                className="h-9 w-9 md:h-10 md:w-10 rounded-xl shadow-md"
+                style={{ background: `linear-gradient(to right, var(--theme-primary), var(--theme-secondary))`, color: 'white' }}
               >
                 <Send className="w-4 h-4" />
               </Button>
             </div>
-            <p className="text-[10px] md:text-xs text-[#8a7c74] mt-2">
+            <p className="text-[10px] md:text-xs mt-2" style={{ color: 'var(--theme-text)', opacity: 0.7 }}>
               Continue your supportive conversation
             </p>
           </div>
@@ -202,17 +207,17 @@ export function ChatList() {
   return (
     <div className="max-w-4xl mx-auto">
       <div className="mb-6 md:mb-8">
-        <h2 className="text-[#2d2424] mb-2">My Saved Chats</h2>
-        <p className="text-[#8a7c74] text-sm md:text-base">
+        <h2 className="mb-2" style={{ color: 'var(--theme-text)' }}>My Saved Chats</h2>
+        <p className="text-sm md:text-base" style={{ color: 'var(--theme-text)', opacity: 0.7 }}>
           Continue conversations with your support buddies
         </p>
       </div>
 
       {savedChats.length === 0 ? (
-        <Card className="p-12 text-center bg-white/80 backdrop-blur-sm border-[#d4756f]/20 rounded-2xl">
-          <Heart className="w-12 h-12 text-[#d4756f]/30 mx-auto mb-4" />
-          <h3 className="text-[#2d2424] mb-2">No saved chats yet</h3>
-          <p className="text-[#8a7c74] text-sm md:text-base">
+        <Card className="p-12 text-center backdrop-blur-sm rounded-2xl border" style={{ backgroundColor: 'var(--theme-card-bg)', opacity: 0.9, borderColor: 'var(--theme-primary)' }}>
+          <Heart className="w-12 h-12 mx-auto mb-4" style={{ color: 'var(--theme-primary)', opacity: 0.3 }} />
+          <h3 className="mb-2" style={{ color: 'var(--theme-text)' }}>No saved chats yet</h3>
+          <p className="text-sm md:text-base" style={{ color: 'var(--theme-text)', opacity: 0.7 }}>
             When you connect with someone through Talking Buddy and both agree to stay connected,
             your conversation will appear here.
           </p>
@@ -222,23 +227,26 @@ export function ChatList() {
           {savedChats.map((chat) => (
             <Card
               key={chat.id}
-              className="p-4 md:p-6 border-2 border-[#d4756f]/20 hover:border-[#d4756f]/40 transition-all bg-white/80 backdrop-blur-sm rounded-2xl cursor-pointer hover:shadow-md"
+              className="p-4 md:p-6 border-2 transition-all backdrop-blur-sm rounded-2xl cursor-pointer hover:shadow-md"
+              style={{ borderColor: 'var(--theme-primary)', backgroundColor: 'var(--theme-card-bg)', opacity: 0.9 }}
               onClick={() => setSelectedChat(chat)}
+              onMouseEnter={(e) => e.currentTarget.style.borderColor = 'var(--theme-primary)'}
+              onMouseLeave={(e) => e.currentTarget.style.borderColor = 'var(--theme-primary)'}
             >
               <div className="flex items-start gap-4">
-                <div className="flex-shrink-0 w-10 h-10 md:w-12 md:h-12 rounded-full bg-gradient-to-br from-[#a8c9a3]/20 to-[#8fb5c9]/20 flex items-center justify-center">
-                  <MessageCircle className="w-5 h-5 md:w-6 md:h-6 text-[#6b9865]" />
+                <div className="flex-shrink-0 w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center" style={{ backgroundColor: 'var(--theme-accent)', opacity: 0.8 }}>
+                  <MessageCircle className="w-5 h-5 md:w-6 md:h-6" style={{ color: 'var(--theme-primary)' }} />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between mb-1">
-                    <h3 className="text-[#2d2424]">Support Buddy</h3>
-                    <span className="text-xs text-[#8a7c74]">
+                    <h3 style={{ color: 'var(--theme-text)' }}>Support Buddy</h3>
+                    <span className="text-xs" style={{ color: 'var(--theme-text)', opacity: 0.7 }}>
                       {new Date(chat.lastMessageTime).toLocaleDateString()}
                     </span>
                   </div>
-                  <p className="text-sm text-[#8a7c74] truncate">{chat.preview}</p>
+                  <p className="text-sm truncate" style={{ color: 'var(--theme-text)', opacity: 0.7 }}>{chat.preview}</p>
                   <div className="mt-2 flex items-center gap-2">
-                    <span className="text-xs text-[#a8c9a3]">
+                    <span className="text-xs" style={{ color: 'var(--theme-primary)' }}>
                       {chat.messages.length} messages
                     </span>
                   </div>

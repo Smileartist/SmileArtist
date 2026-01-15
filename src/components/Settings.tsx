@@ -103,6 +103,7 @@ export function Settings({ onLogout, username }: SettingsProps) {
         chatOtherMessageBg: "#ffffff",
       });
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [darkMode]);
 
   const handleClearData = () => {

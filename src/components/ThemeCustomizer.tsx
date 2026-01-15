@@ -104,7 +104,7 @@ export function ThemeCustomizer({ onClose }: ThemeCustomizerProps) {
 
   return (
     <div className="max-w-4xl mx-auto">
-      <Card className="border border-[var(--theme-primary)]/20 bg-white/90 backdrop-blur-md rounded-2xl shadow-lg overflow-hidden">
+      <Card className="border backdrop-blur-md rounded-2xl shadow-lg overflow-hidden" style={{ borderColor: 'var(--theme-primary)', backgroundColor: 'var(--theme-card-bg)', opacity: 0.95 }}>
         <div className="border-b border-[var(--theme-primary)]/20 p-4 flex items-center justify-between bg-gradient-to-r from-[var(--theme-accent)]/30 to-[var(--theme-accent)]/10">
           <div className="flex items-center gap-3">
             <Palette className="w-6 h-6 text-[var(--theme-primary)]" />

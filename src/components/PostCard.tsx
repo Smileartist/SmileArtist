@@ -23,8 +23,10 @@ export function PostCard({ author, content, title, likes, comments, timestamp, c
   
   return (
     <Card 
-      className="bg-white/80 backdrop-blur-sm p-4 md:p-6 hover:shadow-lg transition-all"
+      className="backdrop-blur-sm p-4 md:p-6 hover:shadow-lg transition-all"
       style={{
+        backgroundColor: 'var(--theme-card-bg)',
+        opacity: 0.9,
         border: `1px solid var(--theme-primary)`,
         borderColor: `var(--theme-primary)33`,
         borderRadius: cardRadius,
