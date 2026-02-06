@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, createContext, useContext } from "react";
 import { ThemeProvider } from "./utils/ThemeContext";
 import { Navigation } from "./components/Navigation";
 import { MobileNavigation } from "./components/MobileNavigation";
@@ -17,20 +17,68 @@ import { Login } from "./components/Login";
 import { Settings } from "./components/Settings";
 import { Sparkles, TrendingUp, BookOpen, Users } from "lucide-react";
 
+import { supabase } from "./utils/supabaseClient";
+
+export const UserDataContext = createContext<{
+  avatarUrl: string | null;
+  refreshAvatar: () => Promise<void>;
+}>({ avatarUrl: null, refreshAvatar: async () => {} });
+
+export const useUserData = () => useContext(UserDataContext);
+
 function AppContent() {
   const [activeView, setActiveView] = useState("home");
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [username, setUsername] = useState("");
   const [userId, setUserId] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+
+  const fetchProfileData = async (id: string) => {
+    const { data } = await supabase
+      .from("profiles")
+      .select("username, avatar_url")
+      .eq("id", id)
+      .maybeSingle();
+    if (data) {
+      setUsername(data.username);
+      setAvatarUrl(data.avatar_url);
+    }
+  };
 
   useEffect(() => {
-    // Check if user is already logged in
-    const savedUser = localStorage.getItem("smileArtist_user");
-    if (savedUser) {
-      const user = JSON.parse(savedUser);
-      setUsername(user.username);
-      setUserId(user.userId);
-      setIsLoggedIn(true);
+
+    const getSession = async () => {
+      const { data, error } = await supabase.auth.getSession();
+      if (data.session) {
+        const user = data.session.user;
+        setUserId(user.id);
+        setIsLoggedIn(true);
+        fetchProfileData(user.id);
+      } else {
+        setIsLoggedIn(false);
+        setUsername("");
+        setUserId("");
+      }
+    };
+    getSession();
+
+    const { data: authListener } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (session) {
+          const user = session.user;
+          setUserId(user.id);
+          setIsLoggedIn(true);
+          fetchProfileData(user.id);
+        } else {
+          setIsLoggedIn(false);
+          setUsername("");
+          setUserId("");
+        }
+      }
+    );
+
+    return () => {
+      authListener.subscription.unsubscribe();
     }
   }, []);
 
@@ -40,16 +88,20 @@ function AppContent() {
     setIsLoggedIn(true);
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem("smileArtist_user");
-    setIsLoggedIn(false);
-    setUsername("");
-    setUserId("");
-    setActiveView("home");
+  const handleLogout = async () => {
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      console.error("Error logging out:", error);
+    } else {
+      setIsLoggedIn(false);
+      setUsername("");
+      setUserId("");
+      setActiveView("home");
+    }
   };
 
   if (!isLoggedIn) {
-    return <Login onLogin={handleLogin} />;
+    return <Login onLogin={handleLogin} />; 
   }
 
   const renderContent = () => {
@@ -71,7 +123,7 @@ function AppContent() {
       case "customize":
         return <ThemeCustomizer />;
       case "profile":
-        return <ProfilePage />;
+        return <ProfilePage onViewChange={setActiveView} />;
       case "notifications":
         return <NotificationPage />;
       case "settings":
@@ -81,22 +133,28 @@ function AppContent() {
     }
   };
 
+  const refreshAvatar = async () => {
+    if (userId) await fetchProfileData(userId);
+  };
+
   return (
-    <div 
-      className="min-h-screen transition-colors duration-300"
-      style={{
-        background: `linear-gradient(to bottom right, var(--theme-background), var(--theme-accent), var(--theme-accent))`,
-        fontFamily: "var(--theme-font-family)",
-        fontSize: "var(--theme-font-size)",
-      }}
-    >
-      <Navigation activeView={activeView} onViewChange={setActiveView} />
-      <MobileHeader onViewChange={setActiveView} />
-      <MobileNavigation activeView={activeView} onViewChange={setActiveView} />
-      <main className="md:ml-64 pt-16 pb-20 px-4 md:pt-0 md:pb-8 md:p-8">
-        {renderContent()}
-      </main>
-    </div>
+    <UserDataContext.Provider value={{ avatarUrl, refreshAvatar }}>
+      <div 
+        className="min-h-screen transition-colors duration-300"
+        style={{
+          background: `linear-gradient(to bottom right, var(--theme-background), var(--theme-accent), var(--theme-accent)) `,
+          fontFamily: "var(--theme-font-family)",
+          fontSize: "var(--theme-font-size)",
+        }}
+      >
+        <Navigation activeView={activeView} onViewChange={setActiveView} />
+        <MobileHeader onViewChange={setActiveView} activeView={activeView} />
+        <MobileNavigation activeView={activeView} onViewChange={setActiveView} />
+        <main className="md:ml-64 pt-16 pb-20 px-4 md:pt-0 md:pb-8 md:p-8">
+          {renderContent()}
+        </main>
+      </div>
+    </UserDataContext.Provider>
   );
 }
 

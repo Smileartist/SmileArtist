@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Heart, MessageCircle, UserPlus, AtSign, Award, CheckCheck, Sparkles } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "./ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
+import { supabase } from "../utils/supabaseClient"; // Assuming supabaseClient is in ../utils/supabaseClient
 
 interface Notification {
   id: string;
@@ -20,128 +21,94 @@ interface Notification {
 }
 
 export function NotificationPage() {
-  const [notifications, setNotifications] = useState<Notification[]>([
-    {
-      id: "1",
-      type: "buddy_request",
-      user: {
-        name: "Alex Thompson",
-        username: "alexthompson",
-        avatar: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop",
-      },
-      content: "Hi, I'm going through a tough time and would really appreciate someone to talk to. Your poetry has been such a comfort.",
-      timestamp: "5m ago",
-      isRead: false,
-    },
-    {
-      id: "2",
-      type: "like",
-      user: {
-        name: "Emily Rivers",
-        username: "emilyrivers",
-        avatar: "https://images.unsplash.com/photo-1624537046903-1e4acee0487f?w=100&h=100&fit=crop",
-      },
-      postTitle: "The Writer's Desk",
-      timestamp: "1h ago",
-      isRead: false,
-    },
-    {
-      id: "3",
-      type: "comment",
-      user: {
-        name: "Marcus Vale",
-        username: "marcusvale",
-        avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop",
-      },
-      content: "This touched my soul. Your words have a way of healing...",
-      postTitle: "Morning Rituals",
-      timestamp: "2h ago",
-      isRead: false,
-    },
-    {
-      id: "4",
-      type: "follow",
-      user: {
-        name: "Sarah Chen",
-        username: "sarahwrites",
-        avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100&h=100&fit=crop",
-      },
-      timestamp: "3h ago",
-      isRead: true,
-    },
-    {
-      id: "5",
-      type: "mention",
-      user: {
-        name: "James Winters",
-        username: "jwinters",
-        avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&h=100&fit=crop",
-      },
-      content: "mentioned you in a post: \"Inspired by @lunapoet's beautiful verse on healing...\"",
-      timestamp: "5h ago",
-      isRead: true,
-    },
-    {
-      id: "6",
-      type: "buddy_accepted",
-      user: {
-        name: "Maya Patel",
-        username: "mayapatel",
-        avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop",
-      },
-      content: "accepted your support offer. You can now start chatting.",
-      timestamp: "1d ago",
-      isRead: true,
-    },
-    {
-      id: "7",
-      type: "milestone",
-      user: {
-        name: "Smile Artist",
-        username: "smileartist",
-        avatar: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=100&h=100&fit=crop",
-      },
-      content: "Congratulations! Your poem 'The Writer's Desk' reached 500 likes! 🎉",
-      timestamp: "2d ago",
-      isRead: true,
-    },
-    {
-      id: "8",
-      type: "like",
-      user: {
-        name: "David Kim",
-        username: "davidkim",
-        avatar: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=100&h=100&fit=crop",
-      },
-      postTitle: "moonlight whispers",
-      timestamp: "2d ago",
-      isRead: true,
-    },
-    {
-      id: "9",
-      type: "comment",
-      user: {
-        name: "Olivia Martinez",
-        username: "oliviapoet",
-        avatar: "https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?w=100&h=100&fit=crop",
-      },
-      content: "Beautiful haiku! The imagery is stunning.",
-      postTitle: "moonlight whispers",
-      timestamp: "3d ago",
-      isRead: true,
-    },
-  ]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchNotifications = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError) throw sessionError;
+
+        if (sessionData.session) {
+          const userId = sessionData.session.user.id;
+          const { data, error: fetchError } = await supabase
+            .from("notifications")
+            .select("*")
+            .eq("recipient_id", userId) // Assuming a 'recipient_id' column in your notifications table
+            .order("created_at", { ascending: false }); // Assuming a 'created_at' column
+
+          if (fetchError) throw fetchError;
+          
+          // Map the fetched data to the Notification interface
+          const formattedNotifications: Notification[] = data.map((n: any) => ({
+            id: n.id,
+            type: n.type,
+            user: {
+              name: n.sender_name, // Assuming sender_name is available
+              username: n.sender_username, // Assuming sender_username is available
+              avatar: n.sender_avatar || "", // Assuming sender_avatar is available, with a fallback
+            },
+            content: n.content,
+            postTitle: n.post_title,
+            timestamp: new Date(n.created_at).toLocaleString(), // Format timestamp
+            isRead: n.is_read,
+          }));
+          setNotifications(formattedNotifications);
+        } else {
+          // No active session, clear notifications or show a message
+          setNotifications([]);
+        }
+      } catch (error) {
+        console.error("Error fetching notifications:", error);
+        setError("Failed to load notifications. Please try again later.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchNotifications();
+  }, []);
 
   const unreadCount = notifications.filter(n => !n.isRead).length;
 
-  const markAllAsRead = () => {
+  const markAllAsRead = async () => {
+    // Optimistic UI update
     setNotifications(notifications.map(n => ({ ...n, isRead: true })));
+    try {
+      // API call to mark all as read
+      const { error } = await supabase
+        .from("notifications")
+        .update({ is_read: true })
+        .eq("recipient_id", (await supabase.auth.getSession()).data.session?.user.id) // Ensure correct user
+        .neq("is_read", true); // Only update unread ones
+      if (error) throw error;
+    } catch (error) {
+      console.error("Error marking all as read:", error);
+      // Revert UI if API call fails
+      // For simplicity, not reverting here, but in a real app you might want to.
+    }
   };
 
-  const markAsRead = (id: string) => {
+  const markAsRead = async (id: string) => {
+    // Optimistic UI update
     setNotifications(notifications.map(n => 
       n.id === id ? { ...n, isRead: true } : n
     ));
+    try {
+      // API call to mark as read
+      const { error } = await supabase
+        .from("notifications")
+        .update({ is_read: true })
+        .eq("id", id);
+      if (error) throw error;
+    } catch (error) {
+      console.error("Error marking notification as read:", error);
+      // Revert UI if API call fails
+    }
   };
 
   const getNotificationIcon = (type: string) => {
@@ -211,10 +178,13 @@ export function NotificationPage() {
     }
   };
 
-  const handleBuddyRequest = (notificationId: string, accept: boolean) => {
+  const handleBuddyRequest = async (notificationId: string, accept: boolean) => {
     // Handle buddy request acceptance/rejection
-    markAsRead(notificationId);
-    // In a real app, this would make an API call
+    markAsRead(notificationId); // Mark as read immediately
+    // In a real app, this would make an API call to update buddy status
+    // For now, we'll just log it.
+    console.log(`Buddy request ${accept ? 'accepted' : 'declined'} for notification ID: ${notificationId}`);
+    // Example: You might call another Supabase function here to update relationships
   };
 
   const filterNotifications = (filter: string) => {
@@ -290,7 +260,7 @@ export function NotificationPage() {
               <div className="flex gap-2">
                 <Button
                   size="sm"
-                  onClick={(e) => {
+                  onClick={(e: React.MouseEvent) => {
                     e.stopPropagation();
                     handleBuddyRequest(notification.id, true);
                   }}
@@ -304,7 +274,7 @@ export function NotificationPage() {
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={(e) => {
+                  onClick={(e: React.MouseEvent) => {
                     e.stopPropagation();
                     handleBuddyRequest(notification.id, false);
                   }}
@@ -331,6 +301,14 @@ export function NotificationPage() {
       </div>
     );
   };
+
+  if (loading) {
+    return <div className="text-center py-12" style={{ color: 'var(--theme-text)' }}>Loading notifications...</div>;
+  }
+
+  if (error) {
+    return <div className="text-center py-12" style={{ color: 'red' }}>{error}</div>;
+  }
 
   return (
     <div className="max-w-3xl mx-auto">

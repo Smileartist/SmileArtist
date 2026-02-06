@@ -3,6 +3,8 @@ import { Card } from "./ui/card";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { useTheme } from "../utils/ThemeContext";
+import { supabase } from "../utils/supabaseClient";
+import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import {
   User,
   Lock,
@@ -31,6 +33,22 @@ interface SettingsProps {
 export function Settings({ onLogout, username }: SettingsProps) {
   const { theme, updateTheme, resetTheme } = useTheme();
   const [activeSection, setActiveSection] = useState<string | null>(null);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchAvatar = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data } = await supabase
+          .from("profiles")
+          .select("avatar_url")
+          .eq("id", user.id)
+          .maybeSingle();
+        if (data) setAvatarUrl(data.avatar_url);
+      }
+    };
+    fetchAvatar();
+  }, []);
 
   // Account Privacy Settings
   const [profileVisibility, setProfileVisibility] = useState(
@@ -186,9 +204,12 @@ export function Settings({ onLogout, username }: SettingsProps) {
       {/* Account Info */}
       <SettingSection title="Account" icon={User}>
         <div className="flex items-center gap-4 py-2">
-          <div className="w-16 h-16 rounded-full bg-gradient-to-br from-[#d4756f] to-[#c9a28f] flex items-center justify-center text-white text-xl">
-            {username.charAt(0).toUpperCase()}
-          </div>
+          <Avatar className="w-16 h-16 border-2 border-[var(--theme-primary)]/20 shadow-md">
+            <AvatarImage src={avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}&background=random`} alt={username} />
+            <AvatarFallback className="bg-gradient-to-br from-[#d4756f] to-[#c9a28f] text-white text-xl">
+              {username.charAt(0).toUpperCase()}
+            </AvatarFallback>
+          </Avatar>
           <div>
             <p style={{ color: darkMode ? '#f5e8e0' : '#2d2424' }}>{username}</p>
             <p className="text-xs" style={{ color: darkMode ? '#c9a28f' : '#8a7c74' }}>Smile Artist Member</p>

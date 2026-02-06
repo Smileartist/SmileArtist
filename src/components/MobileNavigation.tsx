@@ -16,20 +16,23 @@ export function MobileNavigation({ activeView, onViewChange }: MobileNavigationP
 
   return (
     <nav 
-      className="md:hidden fixed bottom-0 left-0 right-0 backdrop-blur-md border-t z-50 shadow-lg"
+      className="md:hidden fixed bottom-0 left-0 right-0 backdrop-blur-md border-t z-50 shadow-lg overflow-x-auto no-scrollbar"
       style={{
         backgroundColor: 'rgba(255, 255, 255, 0.9)',
         borderColor: 'var(--theme-primary)' + '33',
+        scrollbarWidth: 'none',
+        msOverflowStyle: 'none',
+        WebkitOverflowScrolling: 'touch',
       }}
     >
-      <div className="grid grid-cols-5 h-16">
+      <div className="flex justify-between items-center h-16 px-4 w-full min-w-max">
         {navItems.map((item) => {
           const Icon = item.icon;
           return (
             <button
               key={item.id}
               onClick={() => onViewChange(item.id)}
-              className="flex flex-col items-center justify-center gap-1 transition-all"
+              className="flex flex-col items-center justify-center gap-1 transition-all flex-1 py-2"
               style={{
                 color: activeView === item.id ? 'var(--theme-primary)' : 'var(--theme-text)',
                 opacity: activeView === item.id ? 1 : 0.6,

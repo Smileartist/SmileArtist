@@ -3,12 +3,14 @@ import { PenTool, Type, Send, Image as ImageIcon, X } from "lucide-react";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "./ui/tabs";
+import { supabase } from "../utils/supabaseClient";
+import { toast } from "sonner";
 
 export function WritePost() {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
-  const [category, setCategory] = useState("");
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [isPublishing, setIsPublishing] = useState(false);
 
   const suggestedCategories = [
     "Love", "Heartbreak", "Nature", "Urban Life", "Healing", 
@@ -26,9 +28,53 @@ export function WritePost() {
     setSelectedCategories(selectedCategories.filter(c => c !== cat));
   };
 
-  const handlePublish = () => {
-    // Handle publish logic here
-    console.log("Publishing:", { title, content, categories: selectedCategories });
+  const handlePublish = async (type: string) => {
+    if (!content.trim()) {
+      toast.error("Please write something before publishing.");
+      return;
+    }
+
+    setIsPublishing(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        toast.error("You must be logged in to publish.");
+        return;
+      }
+
+      // Fetch user profile for display name and avatar
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("username, avatar_url")
+        .eq("id", user.id)
+        .single();
+
+      const { error } = await supabase.from("posts").insert([
+        {
+          title: title.trim() || (type === 'haiku' ? 'Untitled Haiku' : 'Untitled'),
+          content: content.trim(),
+          categories: selectedCategories,
+          user_id: user.id,
+          author_name: profile?.username || user.user_metadata?.username || user.email?.split('@')[0],
+          author_avatar: profile?.avatar_url || user.user_metadata?.avatar_url || "",
+          // If the 'type' column is missing in Supabase, we skip it for now
+          // type: type, 
+        },
+      ]);
+
+      if (error) throw error;
+
+      toast.success("Post published successfully!");
+      setTitle("");
+      setContent("");
+      setSelectedCategories([]);
+    } catch (error: any) {
+      console.error("Error publishing post:", error);
+      toast.error(error.message || "Failed to publish post.");
+    } finally {
+      setIsPublishing(false);
+    }
   };
 
   return (
@@ -79,7 +125,8 @@ export function WritePost() {
             handleRemoveCategory={handleRemoveCategory}
             suggestedCategories={suggestedCategories}
             handleAddCategory={handleAddCategory}
-            handlePublish={handlePublish}
+            handlePublish={() => handlePublish("poem")}
+            isPublishing={isPublishing}
             placeholder="Let your emotions flow through verses..."
             titlePlaceholder="Your Poem's Title"
           />
@@ -95,7 +142,8 @@ export function WritePost() {
             handleRemoveCategory={handleRemoveCategory}
             suggestedCategories={suggestedCategories}
             handleAddCategory={handleAddCategory}
-            handlePublish={handlePublish}
+            handlePublish={() => handlePublish("story")}
+            isPublishing={isPublishing}
             placeholder="Tell your story in prose..."
             titlePlaceholder="Your Story's Title"
           />
@@ -111,7 +159,8 @@ export function WritePost() {
             handleRemoveCategory={handleRemoveCategory}
             suggestedCategories={suggestedCategories}
             handleAddCategory={handleAddCategory}
-            handlePublish={handlePublish}
+            handlePublish={() => handlePublish("haiku")}
+            isPublishing={isPublishing}
             placeholder="Three lines, 5-7-5 syllables..."
             titlePlaceholder="Your Haiku's Title (optional)"
           />
@@ -133,6 +182,7 @@ interface WriteFormProps {
   handlePublish: () => void;
   placeholder: string;
   titlePlaceholder: string;
+  isPublishing: boolean;
 }
 
 function WriteForm({
@@ -147,6 +197,7 @@ function WriteForm({
   handlePublish,
   placeholder,
   titlePlaceholder,
+  isPublishing,
 }: WriteFormProps) {
   return (
     <div className="space-y-6">
@@ -154,7 +205,7 @@ function WriteForm({
       <div 
         className="p-6 rounded-2xl shadow-md"
         style={{
-          backgroundColor: 'white',
+          backgroundColor: 'var(--theme-card-bg)',
           border: `1px solid var(--theme-primary)33`,
         }}
       >
@@ -163,7 +214,7 @@ function WriteForm({
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder={titlePlaceholder}
-          className="w-full text-2xl outline-none"
+          className="w-full text-2xl outline-none bg-transparent"
           style={{ 
             color: 'var(--theme-text)',
             fontFamily: 'var(--theme-font-family)',
@@ -175,7 +226,7 @@ function WriteForm({
       <div 
         className="p-6 rounded-2xl shadow-md"
         style={{
-          backgroundColor: 'white',
+          backgroundColor: 'var(--theme-card-bg)',
           border: `1px solid var(--theme-primary)33`,
         }}
       >
@@ -184,7 +235,7 @@ function WriteForm({
           onChange={(e) => setContent(e.target.value)}
           placeholder={placeholder}
           rows={12}
-          className="w-full outline-none resize-none"
+          className="w-full outline-none resize-none bg-transparent"
           style={{ 
             color: 'var(--theme-text)',
             fontFamily: 'var(--theme-font-family)',
@@ -274,9 +325,10 @@ function WriteForm({
             background: `linear-gradient(to right, var(--theme-primary), var(--theme-secondary))`,
           }}
           onClick={handlePublish}
+          disabled={isPublishing}
         >
           <Send className="w-4 h-4 mr-2" />
-          Publish
+          {isPublishing ? "Publishing..." : "Publish"}
         </Button>
       </div>
     </div>

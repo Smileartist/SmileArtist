@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Card } from "./ui/card";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
+import { supabase } from "../utils/supabaseClient";
 import { Heart, Sparkles, BookOpen } from "lucide-react";
 
 interface LoginProps {
@@ -16,7 +17,7 @@ export function Login({ onLogin }: LoginProps) {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
 
@@ -35,18 +36,46 @@ export function Login({ onLogin }: LoginProps) {
       return;
     }
 
-    // Generate a unique user ID
-    const userId = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    
-    // Store user data in localStorage
-    localStorage.setItem("smileArtist_user", JSON.stringify({
-      userId,
-      username,
-      email,
-      createdAt: Date.now(),
-    }));
+    try {
+      let user = null;
+      if (isSignup) {
+        const { data, error: signUpError } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: { username },
+          },
+        });
+        if (signUpError) throw signUpError;
+        user = data.user;
+      } else {
+        const { data, error: signInError } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+        if (signInError) throw signInError;
+        user = data.user;
+      }
 
-    onLogin(username, userId);
+      if (user) {
+        if (isSignup) {
+          // Create profile entry for new user
+          const { error: profileError } = await supabase.from("profiles").insert([
+            {
+              id: user.id,
+              username: username.toLowerCase(),
+              full_name: username,
+            },
+          ]);
+          if (profileError) console.error("Error creating profile:", profileError);
+        }
+        onLogin(user.user_metadata?.username || username, user.id);
+      } else {
+        setError("An unexpected error occurred.");
+      }
+    } catch (err: any) {
+      setError(err.message || "Failed to authenticate.");
+    }
   };
 
   return (

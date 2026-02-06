@@ -1,5 +1,7 @@
 import { Home, Search, Bell, User, BookOpen, TrendingUp, Heart, Palette, MessageCircle, Settings as SettingsIcon } from "lucide-react";
 import { Button } from "./ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
+import { useUserData } from "../App";
 import logo from "figma:asset/f15460e64ff6dd326797f0cc15f4e18e934e3112.png";
 
 interface NavigationProps {
@@ -8,6 +10,7 @@ interface NavigationProps {
 }
 
 export function Navigation({ activeView, onViewChange }: NavigationProps) {
+  const { avatarUrl } = useUserData();
   const navItems = [
     { id: "home", label: "Home", icon: Home },
     { id: "search", label: "Search", icon: Search },
@@ -47,13 +50,13 @@ export function Navigation({ activeView, onViewChange }: NavigationProps) {
                   : 'transparent',
                 color: activeView === item.id ? 'white' : 'var(--theme-text)',
               }}
-              onMouseEnter={(e) => {
+              onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => {
                 if (activeView !== item.id) {
                   e.currentTarget.style.backgroundColor = 'var(--theme-accent)';
                   e.currentTarget.style.color = 'var(--theme-primary)';
                 }
               }}
-              onMouseLeave={(e) => {
+              onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => {
                 if (activeView !== item.id) {
                   e.currentTarget.style.backgroundColor = 'transparent';
                   e.currentTarget.style.color = 'var(--theme-text)';
@@ -79,13 +82,13 @@ export function Navigation({ activeView, onViewChange }: NavigationProps) {
             backgroundColor: activeView === "customize" ? 'var(--theme-primary)' : 'transparent',
             color: activeView === "customize" ? 'white' : 'var(--theme-text)',
           }}
-          onMouseEnter={(e) => {
+          onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => {
             if (activeView !== "customize") {
               e.currentTarget.style.backgroundColor = 'var(--theme-accent)';
               e.currentTarget.style.color = 'var(--theme-primary)';
             }
           }}
-          onMouseLeave={(e) => {
+          onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => {
             if (activeView !== "customize") {
               e.currentTarget.style.backgroundColor = 'transparent';
               e.currentTarget.style.color = 'var(--theme-text)';
@@ -99,11 +102,11 @@ export function Navigation({ activeView, onViewChange }: NavigationProps) {
           onClick={() => onViewChange("notifications")}
           className="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all"
           style={{ color: 'var(--theme-text)' }}
-          onMouseEnter={(e) => {
+          onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => {
             e.currentTarget.style.backgroundColor = 'var(--theme-accent)';
             e.currentTarget.style.color = 'var(--theme-primary)';
           }}
-          onMouseLeave={(e) => {
+          onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => {
             e.currentTarget.style.backgroundColor = 'transparent';
             e.currentTarget.style.color = 'var(--theme-text)';
           }}
@@ -115,27 +118,34 @@ export function Navigation({ activeView, onViewChange }: NavigationProps) {
           onClick={() => onViewChange("profile")}
           className="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all"
           style={{ color: 'var(--theme-text)' }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = 'var(--theme-accent)';
-            e.currentTarget.style.color = 'var(--theme-primary)';
+          onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => {
+            if (activeView !== "profile") {
+              e.currentTarget.style.backgroundColor = 'var(--theme-accent)';
+              e.currentTarget.style.color = 'var(--theme-primary)';
+            }
           }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = 'transparent';
-            e.currentTarget.style.color = 'var(--theme-text)';
+          onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => {
+            if (activeView !== "profile") {
+              e.currentTarget.style.backgroundColor = 'transparent';
+              e.currentTarget.style.color = 'var(--theme-text)';
+            }
           }}
         >
-          <User className="w-5 h-5" />
+          <Avatar className="w-5 h-5 border border-[var(--theme-primary)]/20 shadow-sm">
+            <AvatarImage src={avatarUrl || ""} alt="Profile" />
+            <AvatarFallback><User className="w-full h-full p-0.5" /></AvatarFallback>
+          </Avatar>
           <span>Profile</span>
         </button>
         <button 
           onClick={() => onViewChange("chats")}
           className="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all"
           style={{ color: 'var(--theme-text)' }}
-          onMouseEnter={(e) => {
+          onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => {
             e.currentTarget.style.backgroundColor = 'var(--theme-accent)';
             e.currentTarget.style.color = 'var(--theme-primary)';
           }}
-          onMouseLeave={(e) => {
+          onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => {
             e.currentTarget.style.backgroundColor = 'transparent';
             e.currentTarget.style.color = 'var(--theme-text)';
           }}
@@ -147,11 +157,11 @@ export function Navigation({ activeView, onViewChange }: NavigationProps) {
           onClick={() => onViewChange("settings")}
           className="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all"
           style={{ color: 'var(--theme-text)' }}
-          onMouseEnter={(e) => {
+          onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => {
             e.currentTarget.style.backgroundColor = 'var(--theme-accent)';
             e.currentTarget.style.color = 'var(--theme-primary)';
           }}
-          onMouseLeave={(e) => {
+          onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => {
             e.currentTarget.style.backgroundColor = 'transparent';
             e.currentTarget.style.color = 'var(--theme-text)';
           }}
