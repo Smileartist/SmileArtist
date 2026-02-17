@@ -4,20 +4,23 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "./ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
-import { supabase } from "../utils/supabaseClient"; // Assuming supabaseClient is in ../utils/supabaseClient
+import { supabase } from "../utils/supabaseClient";
+
+interface ProfileData {
+  full_name: string;
+  username: string;
+  avatar_url: string;
+}
 
 interface Notification {
   id: string;
   type: "like" | "comment" | "follow" | "mention" | "buddy_request" | "buddy_accepted" | "milestone";
-  user: {
-    name: string;
-    username: string;
-    avatar: string;
-  };
+  sender_id: string; // Only store sender_id, fetch profile separately
+  sender_profile: ProfileData | null; // To store fetched profile data
   content?: string;
-  postTitle?: string;
-  timestamp: string;
-  isRead: boolean;
+  post_id?: string; 
+  created_at: string;
+  is_read: boolean;
 }
 
 export function NotificationPage() {
@@ -37,29 +40,52 @@ export function NotificationPage() {
           const userId = sessionData.session.user.id;
           const { data, error: fetchError } = await supabase
             .from("notifications")
-            .select("*")
-            .eq("recipient_id", userId) // Assuming a 'recipient_id' column in your notifications table
-            .order("created_at", { ascending: false }); // Assuming a 'created_at' column
+            .select(
+              `
+              id,
+              type,
+              content,
+              post_id,
+              is_read,
+              created_at,
+              sender_id
+            `
+            )
+            .eq("recipient_id", userId)
+            .order("created_at", { ascending: false });
 
           if (fetchError) throw fetchError;
           
-          // Map the fetched data to the Notification interface
-          const formattedNotifications: Notification[] = data.map((n: any) => ({
-            id: n.id,
-            type: n.type,
-            user: {
-              name: n.sender_name, // Assuming sender_name is available
-              username: n.sender_username, // Assuming sender_username is available
-              avatar: n.sender_avatar || "", // Assuming sender_avatar is available, with a fallback
-            },
-            content: n.content,
-            postTitle: n.post_title,
-            timestamp: new Date(n.created_at).toLocaleString(), // Format timestamp
-            isRead: n.is_read,
-          }));
+          const notificationsWithProfilesPromises = (data || []).map(async (n: any) => {
+            let senderProfile: ProfileData | null = null;
+            if (n.sender_id) {
+              const { data: profileData, error: profileError } = await supabase
+                .from("profiles")
+                .select("full_name, username, avatar_url")
+                .eq("id", n.sender_id)
+                .single();
+
+              if (profileError) {
+                console.error("Error fetching sender profile for notification:", profileError);
+              } else {
+                senderProfile = profileData;
+              }
+            }
+            return {
+              id: n.id,
+              type: n.type,
+              sender_id: n.sender_id,
+              sender_profile: senderProfile,
+              content: n.content,
+              post_id: n.post_id,
+              created_at: n.created_at,
+              is_read: n.is_read,
+            };
+          });
+
+          const formattedNotifications = await Promise.all(notificationsWithProfilesPromises);
           setNotifications(formattedNotifications);
         } else {
-          // No active session, clear notifications or show a message
           setNotifications([]);
         }
       } catch (error) {
@@ -73,33 +99,27 @@ export function NotificationPage() {
     fetchNotifications();
   }, []);
 
-  const unreadCount = notifications.filter(n => !n.isRead).length;
+  const unreadCount = notifications.filter(n => !n.is_read).length;
 
   const markAllAsRead = async () => {
-    // Optimistic UI update
-    setNotifications(notifications.map(n => ({ ...n, isRead: true })));
+    setNotifications(notifications.map(n => ({ ...n, is_read: true })));
     try {
-      // API call to mark all as read
       const { error } = await supabase
         .from("notifications")
         .update({ is_read: true })
-        .eq("recipient_id", (await supabase.auth.getSession()).data.session?.user.id) // Ensure correct user
-        .neq("is_read", true); // Only update unread ones
+        .eq("recipient_id", (await supabase.auth.getSession()).data.session?.user.id)
+        .eq("is_read", false);
       if (error) throw error;
     } catch (error) {
       console.error("Error marking all as read:", error);
-      // Revert UI if API call fails
-      // For simplicity, not reverting here, but in a real app you might want to.
     }
   };
 
   const markAsRead = async (id: string) => {
-    // Optimistic UI update
     setNotifications(notifications.map(n => 
-      n.id === id ? { ...n, isRead: true } : n
+      n.id === id ? { ...n, is_read: true } : n
     ));
     try {
-      // API call to mark as read
       const { error } = await supabase
         .from("notifications")
         .update({ is_read: true })
@@ -107,7 +127,6 @@ export function NotificationPage() {
       if (error) throw error;
     } catch (error) {
       console.error("Error marking notification as read:", error);
-      // Revert UI if API call fails
     }
   };
 
@@ -132,59 +151,64 @@ export function NotificationPage() {
   };
 
   const getNotificationText = (notification: Notification) => {
+    const truncateText = (text: string, maxLength: number) => {
+      if (text.length > maxLength) {
+        return text.substring(0, maxLength) + "...";
+      }
+      return text;
+    };
+
+    const senderName = notification.sender_profile?.full_name || notification.sender_profile?.username || "Unknown User";
+
     switch (notification.type) {
       case "like":
         return (
           <>
-            <strong>{notification.user.name}</strong> liked your post
-            {notification.postTitle && <span className="opacity-70"> "{notification.postTitle}"</span>}
+            <strong>{senderName}</strong> liked
+            {notification.post_id ? " your post" : " a post"}
           </>
         );
       case "comment":
         return (
           <>
-            <strong>{notification.user.name}</strong> commented on
-            {notification.postTitle && <span className="opacity-70"> "{notification.postTitle}"</span>}
+            <strong>{senderName}</strong> commented on
+            {notification.post_id ? " your post" : " a post"}
           </>
         );
       case "follow":
         return (
           <>
-            <strong>{notification.user.name}</strong> started following you
+            <strong>{senderName}</strong> started following you
           </>
         );
       case "mention":
         return (
           <>
-            <strong>{notification.user.name}</strong> {notification.content}
+            <strong>{senderName}</strong> {notification.content ? truncateText(notification.content, 50) : "mentioned you"}
           </>
         );
       case "buddy_request":
         return (
           <>
-            <strong>{notification.user.name}</strong> sent you a Talking Buddy request
+            <strong>{senderName}</strong> sent you a Talking Buddy request
           </>
         );
       case "buddy_accepted":
         return (
           <>
-            <strong>{notification.user.name}</strong> {notification.content}
+            <strong>{senderName}</strong> {notification.content ? truncateText(notification.content, 50) : "accepted your buddy request"}
           </>
         );
       case "milestone":
         return notification.content;
       default:
-        return notification.content;
+        return notification.content ? truncateText(notification.content, 50) : "";
     }
   };
 
   const handleBuddyRequest = async (notificationId: string, accept: boolean) => {
-    // Handle buddy request acceptance/rejection
-    markAsRead(notificationId); // Mark as read immediately
-    // In a real app, this would make an API call to update buddy status
-    // For now, we'll just log it.
+    markAsRead(notificationId);
     console.log(`Buddy request ${accept ? 'accepted' : 'declined'} for notification ID: ${notificationId}`);
-    // Example: You might call another Supabase function here to update relationships
   };
 
   const filterNotifications = (filter: string) => {
@@ -204,17 +228,15 @@ export function NotificationPage() {
         onClick={() => markAsRead(notification.id)}
         className="flex gap-4 p-4 rounded-2xl transition-all cursor-pointer hover:shadow-md"
         style={{
-          backgroundColor: notification.isRead ? 'transparent' : 'var(--theme-accent)',
-          border: `1px solid ${notification.isRead ? 'var(--theme-primary)22' : 'var(--theme-primary)44'}`,
+          backgroundColor: notification.is_read ? 'transparent' : 'var(--theme-accent)',
+          border: `1px solid ${notification.is_read ? 'var(--theme-primary)22' : 'var(--theme-primary)44'}`, 
         }}
       >
-        {/* Avatar */}
         <Avatar className="w-12 h-12 flex-shrink-0">
-          <AvatarImage src={notification.user.avatar} alt={notification.user.name} />
-          <AvatarFallback>{notification.user.name.split(' ').map(n => n[0]).join('')}</AvatarFallback>
+          <AvatarImage src={notification.sender_profile?.avatar_url} alt={notification.sender_profile?.full_name} />
+          <AvatarFallback>{notification.sender_profile?.full_name ? notification.sender_profile.full_name[0] : '?'}</AvatarFallback>
         </Avatar>
 
-        {/* Content */}
         <div className="flex-1 min-w-0">
           <div className="flex items-start gap-2 mb-1">
             <div 
@@ -252,11 +274,10 @@ export function NotificationPage() {
 
           <div className="flex items-center justify-between mt-2">
             <span className="text-sm" style={{ color: 'var(--theme-text)', opacity: 0.5 }}>
-              {notification.timestamp}
+              {new Date(notification.created_at).toLocaleString()}
             </span>
 
-            {/* Action buttons for buddy requests */}
-            {notification.type === "buddy_request" && !notification.isRead && (
+            {notification.type === "buddy_request" && !notification.is_read && (
               <div className="flex gap-2">
                 <Button
                   size="sm"
@@ -291,8 +312,7 @@ export function NotificationPage() {
           </div>
         </div>
 
-        {/* Unread indicator */}
-        {!notification.isRead && (
+        {!notification.is_read && (
           <div 
             className="w-2 h-2 rounded-full flex-shrink-0 mt-2"
             style={{ backgroundColor: 'var(--theme-primary)' }}
@@ -312,7 +332,6 @@ export function NotificationPage() {
 
   return (
     <div className="max-w-3xl mx-auto">
-      {/* Header */}
       <div className="mb-6">
         <div className="flex items-center justify-between mb-4">
           <div>
@@ -341,7 +360,6 @@ export function NotificationPage() {
         </div>
       </div>
 
-      {/* Tabs */}
       <Tabs defaultValue="all" className="w-full">
         <TabsList 
           className="grid w-full grid-cols-3 mb-6 rounded-xl shadow-md"
@@ -367,7 +385,7 @@ export function NotificationPage() {
           <TabsTrigger value="buddy" className="rounded-xl">
             Talking Buddy
             {notifications.filter(n => 
-              (n.type === "buddy_request" || n.type === "buddy_accepted") && !n.isRead
+              (n.type === "buddy_request" || n.type === "buddy_accepted") && !n.is_read
             ).length > 0 && (
               <Badge 
                 className="ml-2 px-2 py-0.5"
@@ -377,14 +395,13 @@ export function NotificationPage() {
                 }}
               >
                 {notifications.filter(n => 
-                  (n.type === "buddy_request" || n.type === "buddy_accepted") && !n.isRead
+                  (n.type === "buddy_request" || n.type === "buddy_accepted") && !n.is_read
                 ).length}
               </Badge>
             )}
           </TabsTrigger>
         </TabsList>
 
-        {/* All Notifications */}
         <TabsContent value="all" className="space-y-3">
           {filterNotifications("all").length > 0 ? (
             filterNotifications("all").map((notification) => (
@@ -394,7 +411,7 @@ export function NotificationPage() {
             <div className="text-center py-12">
               <div 
                 className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"
-                style={{ backgroundColor: 'var(--theme-accent)' }}
+                style={{ backgroundColor: 'var(--theme-accent)' }} 
               >
                 <CheckCheck className="w-8 h-8" style={{ color: 'var(--theme-primary)' }} />
               </div>
@@ -405,7 +422,6 @@ export function NotificationPage() {
           )}
         </TabsContent>
 
-        {/* Mentions */}
         <TabsContent value="mentions" className="space-y-3">
           {filterNotifications("mentions").length > 0 ? (
             filterNotifications("mentions").map((notification) => (
@@ -415,7 +431,7 @@ export function NotificationPage() {
             <div className="text-center py-12">
               <div 
                 className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"
-                style={{ backgroundColor: 'var(--theme-accent)' }}
+                style={{ backgroundColor: 'var(--theme-accent)' }} 
               >
                 <AtSign className="w-8 h-8" style={{ color: 'var(--theme-primary)' }} />
               </div>
@@ -426,7 +442,6 @@ export function NotificationPage() {
           )}
         </TabsContent>
 
-        {/* Talking Buddy */}
         <TabsContent value="buddy" className="space-y-3">
           {filterNotifications("buddy").length > 0 ? (
             filterNotifications("buddy").map((notification) => (
@@ -436,7 +451,7 @@ export function NotificationPage() {
             <div className="text-center py-12">
               <div 
                 className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"
-                style={{ backgroundColor: 'var(--theme-accent)' }}
+                style={{ backgroundColor: 'var(--theme-accent)' }} 
               >
                 <Award className="w-8 h-8" style={{ color: 'var(--theme-primary)' }} />
               </div>

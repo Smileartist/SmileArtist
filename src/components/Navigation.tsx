@@ -32,7 +32,7 @@ export function Navigation({ activeView, onViewChange }: NavigationProps) {
         <img 
           src={logo} 
           alt="Smile Artist - writes the poetry he cannot live" 
-          className="w-full object-contain"
+          className="w-full object-contain dark:invert"
         />
       </div>
 
@@ -73,13 +73,11 @@ export function Navigation({ activeView, onViewChange }: NavigationProps) {
       <div className="space-y-2 pt-6 border-t" style={{ borderColor: 'var(--theme-primary)' + '33' }}>
         <button 
           onClick={() => onViewChange("customize")}
-          className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
-            activeView === "customize"
-              ? "text-white shadow-md"
-              : "hover:text-white"
-          }`}
+          className="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all shadow-md"
           style={{
-            backgroundColor: activeView === "customize" ? 'var(--theme-primary)' : 'transparent',
+            background: activeView === "customize" 
+              ? `linear-gradient(to right, var(--theme-primary), var(--theme-secondary))`
+              : 'transparent',
             color: activeView === "customize" ? 'white' : 'var(--theme-text)',
           }}
           onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => {
@@ -100,15 +98,24 @@ export function Navigation({ activeView, onViewChange }: NavigationProps) {
         </button>
         <button 
           onClick={() => onViewChange("notifications")}
-          className="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all"
-          style={{ color: 'var(--theme-text)' }}
+          className="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all shadow-md"
+          style={{
+            background: activeView === "notifications" 
+              ? `linear-gradient(to right, var(--theme-primary), var(--theme-secondary))`
+              : 'transparent',
+            color: activeView === "notifications" ? 'white' : 'var(--theme-text)',
+          }}
           onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => {
-            e.currentTarget.style.backgroundColor = 'var(--theme-accent)';
-            e.currentTarget.style.color = 'var(--theme-primary)';
+            if (activeView !== "notifications") {
+              e.currentTarget.style.backgroundColor = 'var(--theme-accent)';
+              e.currentTarget.style.color = 'var(--theme-primary)';
+            }
           }}
           onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => {
-            e.currentTarget.style.backgroundColor = 'transparent';
-            e.currentTarget.style.color = 'var(--theme-text)';
+            if (activeView !== "notifications") {
+              e.currentTarget.style.backgroundColor = 'transparent';
+              e.currentTarget.style.color = 'var(--theme-text)';
+            }
           }}
         >
           <Bell className="w-5 h-5" />
@@ -116,8 +123,13 @@ export function Navigation({ activeView, onViewChange }: NavigationProps) {
         </button>
         <button 
           onClick={() => onViewChange("profile")}
-          className="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all"
-          style={{ color: 'var(--theme-text)' }}
+          className="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all shadow-md"
+          style={{
+            background: activeView === "profile" 
+              ? `linear-gradient(to right, var(--theme-primary), var(--theme-secondary))`
+              : 'transparent',
+            color: activeView === "profile" ? 'white' : 'var(--theme-text)',
+          }}
           onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => {
             if (activeView !== "profile") {
               e.currentTarget.style.backgroundColor = 'var(--theme-accent)';
@@ -139,15 +151,24 @@ export function Navigation({ activeView, onViewChange }: NavigationProps) {
         </button>
         <button 
           onClick={() => onViewChange("chats")}
-          className="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all"
-          style={{ color: 'var(--theme-text)' }}
+          className="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all shadow-md"
+          style={{
+            background: activeView === "chats" 
+              ? `linear-gradient(to right, var(--theme-primary), var(--theme-secondary))`
+              : 'transparent',
+            color: activeView === "chats" ? 'white' : 'var(--theme-text)',
+          }}
           onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => {
-            e.currentTarget.style.backgroundColor = 'var(--theme-accent)';
-            e.currentTarget.style.color = 'var(--theme-primary)';
+            if (activeView !== "chats") {
+              e.currentTarget.style.backgroundColor = 'var(--theme-accent)';
+              e.currentTarget.style.color = 'var(--theme-primary)';
+            }
           }}
           onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => {
-            e.currentTarget.style.backgroundColor = 'transparent';
-            e.currentTarget.style.color = 'var(--theme-text)';
+            if (activeView !== "chats") {
+              e.currentTarget.style.backgroundColor = 'transparent';
+              e.currentTarget.style.color = 'var(--theme-text)';
+            }
           }}
         >
           <MessageCircle className="w-5 h-5" />
@@ -155,15 +176,24 @@ export function Navigation({ activeView, onViewChange }: NavigationProps) {
         </button>
         <button 
           onClick={() => onViewChange("settings")}
-          className="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all"
-          style={{ color: 'var(--theme-text)' }}
+          className="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all shadow-md"
+          style={{
+            background: activeView === "settings" 
+              ? `linear-gradient(to right, var(--theme-primary), var(--theme-secondary))`
+              : 'transparent',
+            color: activeView === "settings" ? 'white' : 'var(--theme-text)',
+          }}
           onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => {
-            e.currentTarget.style.backgroundColor = 'var(--theme-accent)';
-            e.currentTarget.style.color = 'var(--theme-primary)';
+            if (activeView !== "settings") {
+              e.currentTarget.style.backgroundColor = 'var(--theme-accent)';
+              e.currentTarget.style.color = 'var(--theme-primary)';
+            }
           }}
           onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => {
-            e.currentTarget.style.backgroundColor = 'transparent';
-            e.currentTarget.style.color = 'var(--theme-text)';
+            if (activeView !== "settings") {
+              e.currentTarget.style.backgroundColor = 'transparent';
+              e.currentTarget.style.color = 'var(--theme-text)';
+            }
           }}
         >
           <SettingsIcon className="w-5 h-5" />

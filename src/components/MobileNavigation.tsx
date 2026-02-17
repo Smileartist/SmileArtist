@@ -18,11 +18,12 @@ export function MobileNavigation({ activeView, onViewChange }: MobileNavigationP
     <nav 
       className="md:hidden fixed bottom-0 left-0 right-0 backdrop-blur-md border-t z-50 shadow-lg overflow-x-auto no-scrollbar"
       style={{
-        backgroundColor: 'rgba(255, 255, 255, 0.9)',
+        backgroundColor: 'var(--theme-background)',
         borderColor: 'var(--theme-primary)' + '33',
         scrollbarWidth: 'none',
         msOverflowStyle: 'none',
         WebkitOverflowScrolling: 'touch',
+        opacity: 0.95
       }}
     >
       <div className="flex justify-between items-center h-16 px-4 w-full min-w-max">

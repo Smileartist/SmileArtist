@@ -1,4 +1,4 @@
-import { useState } from "react";
+ import { useState } from "react";
 import { PenTool, Type, Send, Image as ImageIcon, X } from "lucide-react";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
@@ -43,25 +43,23 @@ export function WritePost() {
         return;
       }
 
-      // Fetch user profile for display name and avatar
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("username, avatar_url")
-        .eq("id", user.id)
-        .single();
+      // // Fetch user profile for display name and avatar
+      // const { data: profile } = await supabase
+      //   .from("profiles")
+      //   .select("username, avatar_url")
+      //   .eq("id", user.id)
+      //   .single();
 
-      const { error } = await supabase.from("posts").insert([
-        {
-          title: title.trim() || (type === 'haiku' ? 'Untitled Haiku' : 'Untitled'),
-          content: content.trim(),
-          categories: selectedCategories,
-          user_id: user.id,
-          author_name: profile?.username || user.user_metadata?.username || user.email?.split('@')[0],
-          author_avatar: profile?.avatar_url || user.user_metadata?.avatar_url || "",
-          // If the 'type' column is missing in Supabase, we skip it for now
-          // type: type, 
-        },
-      ]);
+     const { error } = await supabase.from("posts").insert([
+  {
+    title: title.trim() || (type === 'haiku' ? 'Untitled Haiku' : 'Untitled'),
+    content: content.trim(),
+    categories: selectedCategories,
+    user_id: user.id,
+    created_at: new Date().toISOString(),
+  },
+]);
+
 
       if (error) throw error;
 

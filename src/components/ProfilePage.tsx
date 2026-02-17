@@ -13,10 +13,11 @@ import { toast } from "sonner";
 import { Checkbox } from "./ui/checkbox";
 
 interface ProfilePageProps {
-  onViewChange?: (view: string) => void;
+  onViewChange?: (view: string, userId?: string | null) => void;
+  userId: string;
 }
 
-export function ProfilePage({ onViewChange }: ProfilePageProps) {
+export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
   const { refreshAvatar } = useUserData();
   const [userPosts, setUserPosts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -39,12 +40,11 @@ export function ProfilePage({ onViewChange }: ProfilePageProps) {
 
   const fetchProfileData = async () => {
     try {
-      const { data: { user: authUser } } = await supabase.auth.getUser();
-      if (authUser) {
+      if (userId) {
         const { data: profile, error: profileError } = await supabase
           .from("profiles")
           .select("*")
-          .eq("id", authUser.id)
+          .eq("id", userId)
           .maybeSingle();
         
         if (profileError) throw profileError;
@@ -75,21 +75,22 @@ export function ProfilePage({ onViewChange }: ProfilePageProps) {
         const { data: posts, error: postsError } = await supabase
           .from("posts")
           .select("*")
-          .eq("user_id", authUser.id)
+          .eq("user_id", userId)
           .order("created_at", { ascending: false });
 
         const formattedPosts = (posts || []).map((post: any) => ({
+          postId: post.id,
           author: {
-            name: profile?.full_name || profile?.username || "User",
+            full_name: profile?.full_name || profile?.username || "User",
             username: profile?.username || "user",
-            avatar: profile?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(profile?.full_name || profile?.username || "user")}&background=random`,
+            avatar_url: profile?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(profile?.full_name || profile?.username || "user")}&background=random`,
           },
           title: post.title,
           content: post.content,
           likes: post.likes || 0,
           comments: post.comments || 0,
-          timestamp: post.created_at ? new Date(post.created_at).toLocaleDateString() : "Just now",
-          category: post.categories?.[0] || "General",
+          created_at: post.created_at ? new Date(post.created_at).toLocaleDateString() : "Just now",
+          category: post.category || "General",
         }));
 
         setUserPosts(formattedPosts);
@@ -103,7 +104,7 @@ export function ProfilePage({ onViewChange }: ProfilePageProps) {
 
   useEffect(() => {
     fetchProfileData();
-  }, []);
+  }, [userId]);
 
   const handleUpdateProfile = async () => {
     setLoading(true);
@@ -431,7 +432,7 @@ export function ProfilePage({ onViewChange }: ProfilePageProps) {
 
           <TabsContent value="posts" className="space-y-4">
             {userPosts.length > 0 ? (
-              userPosts.map((post, index) => <PostCard key={index} {...post} />)
+              userPosts.map((post, index) => <PostCard key={index} post={post} />)
             ) : (
               <div className="text-center py-12 bg-[var(--theme-accent)]/10 rounded-3xl">
                 <BookOpen className="w-12 h-12 mx-auto mb-4 opacity-20" style={{ color: 'var(--theme-primary)' }} />
@@ -460,9 +461,9 @@ export function ProfilePage({ onViewChange }: ProfilePageProps) {
                   <h4 className="text-sm font-bold uppercase tracking-wider mb-3" style={{ color: 'var(--theme-primary)' }}>Motivator Status</h4>
                   <div className="flex items-center gap-2 mb-4">
                     {profileUser.isMotivator ? (
-                      <Badge className="bg-green-500 text-white hover:bg-green-600 border-none">Active Motivator</Badge>
+                      <Badge className="border-none shadow-sm" style={{ backgroundColor: 'var(--theme-primary)', color: 'white' }}>Active Motivator</Badge>
                     ) : (
-                      <Badge variant="outline" className="opacity-50">Standard Member</Badge>
+                      <Badge variant="outline" className="opacity-50" style={{ color: 'var(--theme-text)', borderColor: 'var(--theme-text)40' }}>Standard Member</Badge>
                     )}
                   </div>
                   {profileUser.isMotivator && (

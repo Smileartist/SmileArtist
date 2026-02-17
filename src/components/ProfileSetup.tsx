@@ -28,13 +28,15 @@ export function ProfileSetup({ userId, onComplete }: ProfileSetupProps) {
 
     setLoading(true);
     try {
+      const now = new Date().toISOString();
       const { error } = await supabase.from("profiles").upsert({
         id: userId,
         username: username.toLowerCase(),
         full_name: fullName,
         bio: bio,
         location: location,
-        updated_at: new Date().toISOString(),
+        created_at: now,
+        updated_at: now,
       });
 
       if (error) {

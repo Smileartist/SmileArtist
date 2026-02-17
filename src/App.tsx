@@ -32,6 +32,7 @@ function AppContent() {
   const [username, setUsername] = useState("");
   const [userId, setUserId] = useState("");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null); // New state for selected user profile
 
   const fetchProfileData = async (id: string) => {
     const { data } = await supabase
@@ -100,6 +101,16 @@ function AppContent() {
     }
   };
 
+  // Updated onViewChange to accept an optional userId
+  const handleViewChange = (view: string, targetUserId: string | null = null) => {
+    if (view === "profile") {
+      setSelectedProfileId(targetUserId);
+    } else {
+      setSelectedProfileId(null); // Clear selected user when navigating away from profile
+    }
+    setActiveView(view);
+  };
+
   if (!isLoggedIn) {
     return <Login onLogin={handleLogin} />; 
   }
@@ -109,7 +120,7 @@ function AppContent() {
       case "home":
         return <HomePage />;
       case "search":
-        return <SearchPanel />;
+        return <SearchPanel onViewChange={handleViewChange} />;
       case "trending":
         return <TrendingPage />;
       case "library":
@@ -123,11 +134,18 @@ function AppContent() {
       case "customize":
         return <ThemeCustomizer />;
       case "profile":
-        return <ProfilePage onViewChange={setActiveView} />;
+        return <ProfilePage onViewChange={handleViewChange} userId={selectedProfileId || userId} />;
       case "notifications":
         return <NotificationPage />;
       case "settings":
-        return <Settings onLogout={handleLogout} username={username} />;
+        return (
+          <Settings
+            onLogout={handleLogout}
+            username={username}
+            userId={userId}
+            onUsernameUpdate={setUsername}
+          />
+        );
       default:
         return <HomePage />;
     }
@@ -147,9 +165,9 @@ function AppContent() {
           fontSize: "var(--theme-font-size)",
         }}
       >
-        <Navigation activeView={activeView} onViewChange={setActiveView} />
-        <MobileHeader onViewChange={setActiveView} activeView={activeView} />
-        <MobileNavigation activeView={activeView} onViewChange={setActiveView} />
+        <Navigation activeView={activeView} onViewChange={handleViewChange} />
+        <MobileHeader onViewChange={handleViewChange} activeView={activeView} />
+        <MobileNavigation activeView={activeView} onViewChange={handleViewChange} />
         <main className="md:ml-64 pt-16 pb-20 px-4 md:pt-0 md:pb-8 md:p-8">
           {renderContent()}
         </main>

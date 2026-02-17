@@ -28,12 +28,23 @@ import {
 interface SettingsProps {
   onLogout: () => void;
   username: string;
+  userId: string;
+  onUsernameUpdate: (newUsername: string) => void;
 }
 
-export function Settings({ onLogout, username }: SettingsProps) {
+export function Settings({ onLogout, username, userId, onUsernameUpdate }: SettingsProps) {
   const { theme, updateTheme, resetTheme } = useTheme();
   const [activeSection, setActiveSection] = useState<string | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [editableUsername, setEditableUsername] = useState(username);
+  const [isEditingUsername, setIsEditingUsername] = useState(false);
+  const [savingUsername, setSavingUsername] = useState(false);
+
+  useEffect(() => {
+    if (!isEditingUsername) {
+      setEditableUsername(username);
+    }
+  }, [username, isEditingUsername]);
 
   useEffect(() => {
     const fetchAvatar = async () => {
@@ -49,6 +60,37 @@ export function Settings({ onLogout, username }: SettingsProps) {
     };
     fetchAvatar();
   }, []);
+
+  const handleUsernameSave = async () => {
+    setSavingUsername(true);
+    try {
+      const { error } = await supabase.from("profiles").upsert(
+        {
+          id: userId,
+          username: editableUsername.toLowerCase(),
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "id" }
+      );
+
+      if (error) {
+        if (error.code === "23505") {
+          alert("Username already taken. Please choose a different one.");
+        } else {
+          throw error;
+        }
+        } else {
+          alert("Username updated successfully!");
+          setIsEditingUsername(false);
+          onUsernameUpdate(editableUsername);
+        }
+    } catch (error: any) {
+      console.error("Error updating username:", error);
+      alert("Failed to update username: " + error.message);
+    } finally {
+      setSavingUsername(false);
+    }
+  };
 
   // Account Privacy Settings
   const [profileVisibility, setProfileVisibility] = useState(
@@ -165,15 +207,15 @@ export function Settings({ onLogout, username }: SettingsProps) {
     </Card>
   );
 
-  const SettingRow = ({ label, description, children }: any) => (
-    <div className="flex items-center justify-between py-2">
+  const SettingRow = ({ label, description, children, column = false }: any) => (
+    <div className={`flex ${column ? 'flex-col space-y-2' : 'items-center justify-between'} py-2`}>
       <div className="flex-1">
         <p className="text-sm" style={{ color: darkMode ? '#f5e8e0' : '#2d2424' }}>{label}</p>
         {description && (
           <p className="text-xs mt-0.5" style={{ color: darkMode ? '#c9a28f' : '#8a7c74' }}>{description}</p>
         )}
       </div>
-      <div>{children}</div>
+      <div className={column ? 'w-full' : ''}>{children}</div>
     </div>
   );
 
@@ -206,15 +248,71 @@ export function Settings({ onLogout, username }: SettingsProps) {
         <div className="flex items-center gap-4 py-2">
           <Avatar className="w-16 h-16 border-2 border-[var(--theme-primary)]/20 shadow-md">
             <AvatarImage src={avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}&background=random`} alt={username} />
-            <AvatarFallback className="bg-gradient-to-br from-[#d4756f] to-[#c9a28f] text-white text-xl">
-              {username.charAt(0).toUpperCase()}
-            </AvatarFallback>
-          </Avatar>
-          <div>
-            <p style={{ color: darkMode ? '#f5e8e0' : '#2d2424' }}>{username}</p>
-            <p className="text-xs" style={{ color: darkMode ? '#c9a28f' : '#8a7c74' }}>Smile Artist Member</p>
-          </div>
+      <AvatarFallback className="bg-gradient-to-br from-[#d4756f] to-[#c9a28f] text-white text-xl">
+        {username?.charAt(0).toUpperCase() || "U"}
+      </AvatarFallback>
+      </Avatar>
+      <div>
+        <p style={{ color: darkMode ? '#f5e8e0' : '#2d2424' }}>{username}</p>
+        <p className="text-xs" style={{ color: darkMode ? '#c9a28f' : '#8a7c74' }}>Smile Artist Member</p>
+      </div>
         </div>
+
+        <SettingRow 
+          label="Username" 
+          description="Your unique identifier on Smile Artist"
+          column={isEditingUsername}
+        >
+          {isEditingUsername ? (
+            <div className="space-y-3">
+              <Input
+                type="text"
+                value={editableUsername}
+                onChange={(e) => setEditableUsername(e.target.value)}
+                className="w-full rounded-xl border-[var(--theme-primary)]/20 focus:border-[var(--theme-primary)] bg-[var(--theme-card-bg)]"
+                disabled={savingUsername}
+                autoFocus
+              />
+              <div className="flex justify-end space-x-2">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setIsEditingUsername(false);
+                    setEditableUsername(username);
+                  }}
+                  disabled={savingUsername}
+                  className="rounded-xl border-[var(--theme-primary)]/20 hover:bg-[var(--theme-primary)]/10"
+                  style={{ color: darkMode ? '#f5e8e0' : '#2d2424' }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleUsernameSave}
+                  disabled={savingUsername || editableUsername === username}
+                  className="rounded-xl px-6"
+                  style={{
+                    background: "linear-gradient(to right, var(--theme-primary), var(--theme-secondary))",
+                    color: "white",
+                  }}
+                >
+                  {savingUsername ? "Saving..." : "Save"}
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center space-x-2">
+              <span style={{ color: darkMode ? '#f5e8e0' : '#2d2424' }}>@{username}</span>
+              <Button
+                variant="outline"
+                onClick={() => setIsEditingUsername(true)}
+                className="rounded-xl border-[var(--theme-primary)]/20 hover:bg-[var(--theme-primary)]/10"
+                style={{ color: darkMode ? '#f5e8e0' : '#2d2424' }}
+              >
+                Edit
+              </Button>
+            </div>
+          )}
+        </SettingRow>
       </SettingSection>
 
       {/* Privacy Settings */}

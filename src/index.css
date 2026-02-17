@@ -3111,8 +3111,15 @@
   --sidebar-ring: #d4756f;
 }
 
-.dark {
-  --background: oklch(.145 0 0);
+  .dark {
+    --background: oklch(.145 0 0);
+  }
+
+  .dark .dark\:invert {
+    filter: invert(100%) !important;
+  }
+
+  .dark {
   --foreground: oklch(.985 0 0);
   --card: oklch(.145 0 0);
   --card-foreground: oklch(.985 0 0);
