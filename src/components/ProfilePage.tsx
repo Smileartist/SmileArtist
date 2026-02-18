@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { useUserData } from "../App";
 import { MapPin, Calendar, Edit2, Users, BookOpen, Award, Save, X, Image as ImageIcon, Trash2, Camera, Upload, UserPlus, UserCheck, Clock } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "./ui/tabs";
@@ -24,7 +25,10 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
   const [loading, setLoading] = useState(true);
   const [profileData, setProfileData] = useState<any>(null);
   const [isEditing, setIsEditing] = useState(false);
-  
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [followerCount, setFollowerCount] = useState(0);
+  const [followLoading, setFollowLoading] = useState(false);
+
   // Edit form state
   const [editFullName, setEditFullName] = useState("");
   const [editBio, setEditBio] = useState("");
@@ -38,6 +42,62 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
   const [newInterest, setNewInterest] = useState("");
   const [editMotivatorTitle, setEditMotivatorTitle] = useState("");
   const [editMotivatorBio, setEditMotivatorBio] = useState("");
+
+  const fetchFollowData = async (currId: string | null) => {
+    if (!userId) return;
+    const { count } = await supabase
+      .from("follows")
+      .select("*", { count: "exact", head: true })
+      .eq("following_id", userId);
+    setFollowerCount(count ?? 0);
+
+    if (currId && currId !== userId) {
+      const { data } = await supabase
+        .from("follows")
+        .select("follower_id")
+        .eq("follower_id", currId)
+        .eq("following_id", userId)
+        .maybeSingle();
+      setIsFollowing(!!data);
+    }
+  };
+
+  const handleFollow = async () => {
+    if (!currentUserId) return;
+    setFollowLoading(true);
+    try {
+      if (isFollowing) {
+        await supabase.from("follows").delete()
+          .eq("follower_id", currentUserId)
+          .eq("following_id", userId);
+        setIsFollowing(false);
+        setFollowerCount(c => Math.max(0, c - 1));
+        toast.success("Unfollowed");
+      } else {
+        await supabase.from("follows").insert({
+          follower_id: currentUserId,
+          following_id: userId,
+        });
+        setIsFollowing(true);
+        setFollowerCount(c => c + 1);
+        // Send follow notification
+        await ensureUserExists(currentUserId);
+        await ensureUserExists(userId);
+        await supabase.from("notifications").insert({
+          recipient_id: userId,
+          sender_id: currentUserId,
+          type: "follow",
+          content: "started following you",
+          is_read: false,
+        });
+        toast.success("Following! 🎉");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Failed to update follow status");
+    } finally {
+      setFollowLoading(false);
+    }
+  };
 
   const fetchProfileData = async () => {
     try {
@@ -117,6 +177,9 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
   const isOwnProfile = currentUserId === userId;
 
   // ── Buddy system ──────────────────────────────────────────────
+  // Grid post modal
+  const [selectedPost, setSelectedPost] = useState<any>(null);
+
   const [buddyStatus, setBuddyStatus] = useState<null | 'pending_sent' | 'pending_received' | 'accepted'>(null);
   const [buddyRequestId, setBuddyRequestId] = useState<string | null>(null);
   const [buddyLoading, setBuddyLoading] = useState(false);
@@ -223,6 +286,7 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
     if (currentUserId && userId && currentUserId !== userId) {
       checkBuddyStatus();
     }
+    fetchFollowData(currentUserId);
   }, [currentUserId, userId]);
   // ──────────────────────────────────────────────────────────────
 
@@ -331,7 +395,7 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
     motivatorBio: profileData?.motivator_bio || "",
     stats: {
       posts: userPosts.length,
-      followers: 0,
+      followers: followerCount,
       following: 0,
     },
     interests: profileData?.interests || [],
@@ -440,9 +504,23 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
                   <h1 style={{ color: 'var(--theme-text)' }}>{profileUser.name}</h1>
                   <span className="opacity-60" style={{ color: 'var(--theme-text)' }}>{profileUser.username}</span>
                 </div>
-                {/* Buddy button — only on other people's profiles */}
+                {/* Follow + Buddy buttons — only on other people's profiles */}
                 {!isOwnProfile && currentUserId && (
-                  <div className="flex gap-2 mb-4 justify-center md:justify-start">
+                  <div className="flex flex-wrap gap-2 mb-4 justify-center md:justify-start">
+                    {/* Follow button */}
+                    <Button
+                      onClick={handleFollow}
+                      disabled={followLoading}
+                      variant={isFollowing ? "outline" : "default"}
+                      className="rounded-xl shadow-md"
+                      style={isFollowing
+                        ? { borderColor: 'var(--theme-primary)', color: 'var(--theme-primary)' }
+                        : { background: 'linear-gradient(to right, var(--theme-primary), var(--theme-secondary))', color: 'white' }
+                      }
+                    >
+                      <UserPlus className="w-4 h-4 mr-2" />
+                      {followLoading ? '…' : isFollowing ? 'Following ✓' : 'Follow'}
+                    </Button>
                     {buddyStatus === null && (
                       <Button
                         onClick={sendBuddyRequest}
@@ -501,9 +579,25 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
                   </div>
                 )}
                 <p className="mb-4 max-w-2xl" style={{ color: 'var(--theme-text)', opacity: 0.8 }}>{profileUser.bio}</p>
-                <div className="flex flex-wrap gap-4 text-sm mb-4 justify-center md:justify-start">
-                  <div className="flex items-center gap-1" style={{ color: 'var(--theme-text)', opacity: 0.7 }}><MapPin className="w-4 h-4" />{profileUser.location}</div>
-                  <div className="flex items-center gap-1" style={{ color: 'var(--theme-text)', opacity: 0.7 }}><Calendar className="w-4 h-4" />Joined {profileUser.joinDate}</div>
+                {/* Meta row */}
+                <div className="flex flex-wrap text-sm mb-4 justify-center md:justify-start" style={{ columnGap: '24px', rowGap: '4px' }}>
+                  <div className="flex items-center" style={{ color: 'var(--theme-text)', opacity: 0.7, gap: '6px' }}>
+                    <MapPin className="w-4 h-4" style={{ flexShrink: 0 }} />
+                    <span>{profileUser.location}</span>
+                  </div>
+                  <div className="flex items-center" style={{ color: 'var(--theme-text)', opacity: 0.7, gap: '6px' }}>
+                    <Calendar className="w-4 h-4" style={{ flexShrink: 0 }} />
+                    <span>{"Joined " + profileUser.joinDate}</span>
+                  </div>
+                </div>
+                {/* Stats row */}
+                <div className="flex text-sm mb-4 justify-center md:justify-start" style={{ columnGap: '40px' }}>
+                  <span style={{ color: 'var(--theme-text)' }}>
+                    <strong>{profileUser.stats.posts}</strong>{" Posts"}
+                  </span>
+                  <span style={{ color: 'var(--theme-text)' }}>
+                    <strong>{followerCount}</strong>{" Followers"}
+                  </span>
                 </div>
               </>
             ) : (
@@ -593,9 +687,87 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
             <TabsTrigger value="about" className="rounded-xl"><Users className="w-4 h-4 mr-2" />About</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="posts" className="space-y-4">
+          <TabsContent value="posts">
             {userPosts.length > 0 ? (
-              userPosts.map((post, index) => <PostCard key={index} post={post} />)
+              /* ── 3-column mini PostCard grid ── */
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
+                {userPosts.map((post, index) => (
+                  <div
+                    key={index}
+                    onClick={() => setSelectedPost(post)}
+                    style={{
+                      cursor: 'pointer',
+                      borderRadius: '14px',
+                      overflow: 'hidden',
+                      backgroundColor: 'var(--theme-card-bg)',
+                      border: '1px solid var(--theme-primary)22',
+                      padding: '10px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '6px',
+                      transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+                    }}
+                    onMouseEnter={(e) => {
+                      (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)';
+                      (e.currentTarget as HTMLElement).style.boxShadow = '0 6px 20px rgba(0,0,0,0.12)';
+                    }}
+                    onMouseLeave={(e) => {
+                      (e.currentTarget as HTMLElement).style.transform = 'translateY(0)';
+                      (e.currentTarget as HTMLElement).style.boxShadow = 'none';
+                    }}
+                  >
+                    {/* Avatar + name */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                      <img
+                        src={post.author?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(post.author?.full_name || 'U')}&background=random`}
+                        alt=""
+                        style={{ width: 18, height: 18, borderRadius: '50%', flexShrink: 0, objectFit: 'cover' }}
+                      />
+                      <span style={{ fontSize: '10px', fontWeight: 600, color: 'var(--theme-text)', opacity: 0.8, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
+                        {post.author?.full_name || 'User'}
+                      </span>
+                    </div>
+
+                    {/* Title */}
+                    {post.title && (
+                      <p style={{
+                        fontSize: '11px', fontWeight: 700,
+                        color: 'var(--theme-text)',
+                        overflow: 'hidden',
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical',
+                        lineHeight: 1.3,
+                        margin: 0,
+                      }}>
+                        {post.title}
+                      </p>
+                    )}
+
+                    {/* Content snippet */}
+                    <p style={{
+                      fontSize: '10px',
+                      color: 'var(--theme-text)',
+                      opacity: 0.65,
+                      overflow: 'hidden',
+                      display: '-webkit-box',
+                      WebkitLineClamp: 3,
+                      WebkitBoxOrient: 'vertical',
+                      lineHeight: 1.4,
+                      margin: 0,
+                      flexGrow: 1,
+                    }}>
+                      {post.content?.slice(0, 120)}
+                    </p>
+
+                    {/* Stats footer */}
+                    <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+                      <span style={{ fontSize: '10px', color: 'var(--theme-text)', opacity: 0.55 }}>❤️ {post.likes ?? 0}</span>
+                      <span style={{ fontSize: '10px', color: 'var(--theme-text)', opacity: 0.55 }}>💬 {post.comments ?? 0}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
             ) : (
               <div className="text-center py-12 bg-[var(--theme-accent)]/10 rounded-3xl">
                 <BookOpen className="w-12 h-12 mx-auto mb-4 opacity-20" style={{ color: 'var(--theme-primary)' }} />
@@ -664,6 +836,54 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* ── Full-post modal rendered via portal so fixed positioning is always relative to viewport ── */}
+      {selectedPost && createPortal(
+        <div
+          style={{
+            position: 'fixed', inset: 0, zIndex: 9999,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: '16px',
+            backgroundColor: 'rgba(0,0,0,0.75)',
+            backdropFilter: 'blur(4px)',
+          }}
+          onClick={() => setSelectedPost(null)}
+        >
+          <div
+            style={{
+              position: 'relative',
+              width: '100%',
+              maxWidth: '560px',
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              borderRadius: '24px',
+              boxShadow: '0 25px 60px rgba(0,0,0,0.3)',
+              backgroundColor: 'var(--theme-card-bg)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Close button */}
+            <button
+              onClick={() => setSelectedPost(null)}
+              style={{
+                position: 'absolute', top: '12px', right: '12px', zIndex: 10,
+                width: '32px', height: '32px',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                borderRadius: '50%', border: 'none', cursor: 'pointer',
+                backgroundColor: 'var(--theme-accent)', color: 'var(--theme-primary)',
+              }}
+              aria-label="Close"
+            >
+              <X size={16} />
+            </button>
+
+            <div style={{ padding: '8px' }}>
+              <PostCard post={selectedPost} />
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 }

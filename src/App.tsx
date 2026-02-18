@@ -18,6 +18,7 @@ import { Settings } from "./components/Settings";
 import { Sparkles, TrendingUp, BookOpen, Users } from "lucide-react";
 
 import { supabase } from "./utils/supabaseClient";
+import { LanguageProvider } from "./utils/LanguageContext";
 
 export const UserDataContext = createContext<{
   avatarUrl: string | null;
@@ -123,6 +124,53 @@ function AppContent() {
     setActiveView(view);
   };
 
+  // ── Realtime push notifications ────────────────────────────────
+  // Must be declared BEFORE any early return to satisfy Rules of Hooks
+  useEffect(() => {
+    if (!userId) return;
+
+    const channel = supabase
+      .channel(`push-notifs-${userId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "notifications",
+          filter: `recipient_id=eq.${userId}`,
+        },
+        (payload: any) => {
+          if (
+            localStorage.getItem("app_notifications") !== "false" &&
+            "Notification" in window &&
+            Notification.permission === "granted"
+          ) {
+            const typeLabels: Record<string, string> = {
+              like: "❤️ Someone liked your post",
+              comment: "💬 New comment on your post",
+              follow: "👤 Someone followed you",
+              buddy_request: "🤝 New buddy request",
+              buddy_accepted: "✅ Buddy request accepted",
+              mention: "📣 You were mentioned",
+            };
+            const body =
+              typeLabels[payload.new.type] ||
+              payload.new.content ||
+              "You have a new notification";
+            navigator.serviceWorker.ready.then((reg) => {
+              reg.showNotification("Smile Artist", { body, icon: "/favicon.ico" });
+            });
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [userId]);
+  // ──────────────────────────────────────────────────────────────
+
   if (!isLoggedIn) {
     return <Login onLogin={handleLogin} />; 
   }
@@ -194,8 +242,10 @@ function AppContent() {
 
 export default function App() {
   return (
-    <ThemeProvider>
-      <AppContent />
-    </ThemeProvider>
+    <LanguageProvider>
+      <ThemeProvider>
+        <AppContent />
+      </ThemeProvider>
+    </LanguageProvider>
   );
 }

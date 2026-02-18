@@ -1,7 +1,9 @@
+import { useState, useEffect } from "react";
 import { Home, Search, Bell, User, BookOpen, TrendingUp, Heart, Palette, MessageCircle, Settings as SettingsIcon } from "lucide-react";
 import { Button } from "./ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { useUserData } from "../App";
+import { useLanguage } from "../utils/LanguageContext";
 import logo from "figma:asset/f15460e64ff6dd326797f0cc15f4e18e934e3112.png";
 
 interface NavigationProps {
@@ -11,12 +13,24 @@ interface NavigationProps {
 
 export function Navigation({ activeView, onViewChange }: NavigationProps) {
   const { avatarUrl } = useUserData();
+  const { t } = useLanguage();
+
+  // Activity status — reactive via custom event dispatched from Settings
+  const [showActivity, setShowActivity] = useState(
+    localStorage.getItem("privacy_showActivity") !== "false"
+  );
+  useEffect(() => {
+    const handler = (e: Event) => setShowActivity((e as CustomEvent<boolean>).detail);
+    window.addEventListener("activityStatusChanged", handler);
+    return () => window.removeEventListener("activityStatusChanged", handler);
+  }, []);
+
   const navItems = [
-    { id: "home", label: "Home", icon: Home },
-    { id: "search", label: "Search", icon: Search },
-    { id: "trending", label: "Trending", icon: TrendingUp },
-    { id: "library", label: "Library", icon: BookOpen },
-    { id: "buddy", label: "Talking Buddy", icon: Heart },
+    { id: "home", label: t("home"), icon: Home },
+    { id: "search", label: t("search"), icon: Search },
+    { id: "trending", label: t("trending"), icon: TrendingUp },
+    { id: "library", label: t("library"), icon: BookOpen },
+    { id: "buddy", label: t("talking_buddy"), icon: Heart },
   ];
 
   return (
@@ -71,7 +85,7 @@ export function Navigation({ activeView, onViewChange }: NavigationProps) {
       </div>
 
       <div className="space-y-2 pt-6 border-t" style={{ borderColor: 'var(--theme-primary)' + '33' }}>
-        <button 
+        <button
           onClick={() => onViewChange("customize")}
           className="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all shadow-md"
           style={{
@@ -94,7 +108,7 @@ export function Navigation({ activeView, onViewChange }: NavigationProps) {
           }}
         >
           <Palette className="w-5 h-5" />
-          <span>Customize Theme</span>
+          <span>{t("customize_theme")}</span>
         </button>
         <button 
           onClick={() => onViewChange("notifications")}
@@ -119,7 +133,7 @@ export function Navigation({ activeView, onViewChange }: NavigationProps) {
           }}
         >
           <Bell className="w-5 h-5" />
-          <span>Notifications</span>
+          <span>{t("notifications")}</span>
         </button>
         <button 
           onClick={() => onViewChange("profile")}
@@ -143,11 +157,16 @@ export function Navigation({ activeView, onViewChange }: NavigationProps) {
             }
           }}
         >
-          <Avatar className="w-5 h-5 border border-[var(--theme-primary)]/20 shadow-sm">
-            <AvatarImage src={avatarUrl || ""} alt="Profile" />
-            <AvatarFallback><User className="w-full h-full p-0.5" /></AvatarFallback>
-          </Avatar>
-          <span>Profile</span>
+          <div className="relative w-5 h-5">
+            <Avatar className="w-5 h-5 border border-[var(--theme-primary)]/20 shadow-sm">
+              <AvatarImage src={avatarUrl || ""} alt="Profile" />
+              <AvatarFallback><User className="w-full h-full p-0.5" /></AvatarFallback>
+            </Avatar>
+            {showActivity && (
+              <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 bg-green-500 rounded-full border border-white" />
+            )}
+          </div>
+          <span>{t("profile")}</span>
         </button>
         <button 
           onClick={() => onViewChange("chats")}
@@ -172,7 +191,7 @@ export function Navigation({ activeView, onViewChange }: NavigationProps) {
           }}
         >
           <MessageCircle className="w-5 h-5" />
-          <span>My Chats</span>
+          <span>{t("my_chats")}</span>
         </button>
         <button 
           onClick={() => onViewChange("settings")}
@@ -197,7 +216,7 @@ export function Navigation({ activeView, onViewChange }: NavigationProps) {
           }}
         >
           <SettingsIcon className="w-5 h-5" />
-          <span>Settings</span>
+          <span>{t("settings")}</span>
         </button>
       </div>
 
@@ -208,7 +227,7 @@ export function Navigation({ activeView, onViewChange }: NavigationProps) {
         }}
         onClick={() => onViewChange("write")}
       >
-        Write
+        {t("write")}
       </Button>
     </nav>
   );
