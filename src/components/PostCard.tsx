@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { Heart, MessageCircle, Bookmark, MoreHorizontal, Send, Link2, Flag, User } from "lucide-react";
 import { Card } from "./ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
-import { Button } from "./ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -147,9 +146,12 @@ export function PostCard({ post }: PostCardProps) {
         {/* 3-dot dropdown */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="flex-shrink-0">
+            <button
+              className="flex-shrink-0 w-9 h-9 flex items-center justify-center rounded-md hover:bg-[var(--theme-accent)] transition-colors"
+              style={{ color: "var(--theme-text)" }}
+            >
               <MoreHorizontal className="w-5 h-5" />
-            </Button>
+            </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-44">
             <DropdownMenuItem onClick={handleAuthorClick} className="cursor-pointer">
