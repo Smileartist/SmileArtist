@@ -69,6 +69,7 @@ create table comments (
   post_id uuid not null,
   user_id uuid not null,
   content text not null,
+  likes integer default 0,
   created_at timestamptz default now()
 );
 
@@ -287,6 +288,28 @@ foreign key (user1_id) references users(id) on delete cascade;
 alter table buddies
 add constraint fk_buddies_user2
 foreign key (user2_id) references users(id) on delete cascade;
+
+
+-- ========================
+-- COMMENT LIKES
+-- ========================
+create table comment_likes (
+  user_id uuid,
+  comment_id uuid,
+  created_at timestamptz default now(),
+  primary key (user_id, comment_id)
+);
+
+alter table comment_likes
+add constraint fk_comment_likes_user
+foreign key (user_id) references profiles(id) on delete cascade;
+
+alter table comment_likes
+add constraint fk_comment_likes_comment
+foreign key (comment_id) references comments(id) on delete cascade;
+
+-- Run this migration on existing DB:
+-- alter table comments add column if not exists likes integer default 0;
 
 
 -- ========================
