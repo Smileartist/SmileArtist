@@ -3,7 +3,7 @@ import { Card } from "./ui/card";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { supabase } from "../utils/supabaseClient";
-import { Heart, Sparkles, BookOpen } from "lucide-react";
+import { Heart, Sparkles, BookOpen, Eye, EyeOff } from "lucide-react";
 
 interface LoginProps {
   onLogin: (username: string, userId: string) => void;
@@ -16,6 +16,8 @@ export function Login({ onLogin }: LoginProps) {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -171,13 +173,23 @@ export function Login({ onLogin }: LoginProps) {
               <label className="block text-sm text-[#2d2424] mb-1.5">
                 Password
               </label>
-              <Input
-                type="password"
-                placeholder="Enter your password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full border-[#d4756f]/20 rounded-xl focus:border-[#d4756f]"
-              />
+              <div className="relative">
+                <Input
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Enter your password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full border-[#d4756f]/20 rounded-xl focus:border-[#d4756f] pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#8a7c74] hover:text-[#d4756f] transition-colors"
+                  tabIndex={-1}
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
 
             {isSignup && (
@@ -185,13 +197,23 @@ export function Login({ onLogin }: LoginProps) {
                 <label className="block text-sm text-[#2d2424] mb-1.5">
                   Confirm Password
                 </label>
-                <Input
-                  type="password"
-                  placeholder="Confirm your password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="w-full border-[#d4756f]/20 rounded-xl focus:border-[#d4756f]"
-                />
+                <div className="relative">
+                  <Input
+                    type={showConfirmPassword ? "text" : "password"}
+                    placeholder="Confirm your password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="w-full border-[#d4756f]/20 rounded-xl focus:border-[#d4756f] pr-10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword((v) => !v)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#8a7c74] hover:text-[#d4756f] transition-colors"
+                    tabIndex={-1}
+                  >
+                    {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
               </div>
             )}
 
