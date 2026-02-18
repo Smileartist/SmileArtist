@@ -313,6 +313,75 @@ foreign key (comment_id) references comments(id) on delete cascade;
 
 
 -- ========================
+-- POSTGRES RPC FUNCTIONS
+-- (Run these in Supabase SQL Editor)
+-- ========================
+
+-- find_buddy_match: finds a waiting user with the opposite role,
+-- creates a chat, adds both as participants, removes both from queue.
+-- Returns the new chat_id, or NULL if no match found.
+CREATE OR REPLACE FUNCTION find_buddy_match(p_user uuid, p_role text)
+RETURNS uuid AS $$
+DECLARE
+  v_opposite_role text;
+  v_other_user uuid;
+  v_chat_id uuid;
+BEGIN
+  IF p_role = 'seeker' THEN
+    v_opposite_role := 'listener';
+  ELSE
+    v_opposite_role := 'seeker';
+  END IF;
+
+  -- Find the earliest-queued user with the opposite role
+  SELECT user_id INTO v_other_user
+  FROM matchmaking_queue
+  WHERE role = v_opposite_role AND user_id != p_user
+  ORDER BY created_at ASC
+  LIMIT 1;
+
+  IF v_other_user IS NULL THEN
+    RETURN NULL;
+  END IF;
+
+  -- Create a new temporary buddy chat
+  INSERT INTO chats (type, status, expires_at)
+  VALUES ('buddy', 'temporary', now() + interval '24 hours')
+  RETURNING id INTO v_chat_id;
+
+  -- Add both users as participants
+  INSERT INTO chat_participants (chat_id, user_id) VALUES (v_chat_id, p_user);
+  INSERT INTO chat_participants (chat_id, user_id) VALUES (v_chat_id, v_other_user);
+
+  -- Remove both from the queue
+  DELETE FROM matchmaking_queue WHERE user_id IN (p_user, v_other_user);
+
+  RETURN v_chat_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+
+-- accept_buddy_request: marks the buddy_request as accepted
+-- and makes the chat permanent (removes expiry).
+CREATE OR REPLACE FUNCTION accept_buddy_request(p_chat_id uuid, p_user_a uuid, p_user_b uuid)
+RETURNS void AS $$
+BEGIN
+  UPDATE buddy_requests
+  SET status = 'accepted'
+  WHERE chat_id = p_chat_id
+    AND (
+      (from_user = p_user_a AND to_user = p_user_b) OR
+      (from_user = p_user_b AND to_user = p_user_a)
+    );
+
+  UPDATE chats
+  SET status = 'permanent', expires_at = NULL
+  WHERE id = p_chat_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+
+-- ========================
 -- BUDDY REQUESTS
 -- ========================
 create table buddy_requests (

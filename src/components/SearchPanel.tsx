@@ -55,13 +55,13 @@ export function SearchPanel({ onViewChange }: SearchPanelProps) {
       <div className="mb-8">
         <h2 className="mb-4" style={{ color: 'var(--theme-text)' }}>Explore</h2>
         <div className="relative">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 opacity-50" style={{ color: 'var(--theme-text)' }} />
+          <Search className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 opacity-50" style={{ color: 'var(--theme-text)' }} />
           <Input
             type="text"
             placeholder="Search for poems, poets, or topics..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-12 h-14 rounded-2xl border-2 transition-all focus:shadow-lg bg-[var(--theme-card-bg)]"
+            className="w-full pr-12 h-14 rounded-2xl border-2 transition-all focus:shadow-lg bg-[var(--theme-card-bg)]"
             style={{ borderColor: 'var(--theme-primary)33', color: 'var(--theme-text)' }}
           />
         </div>

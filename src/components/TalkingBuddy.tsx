@@ -205,7 +205,7 @@ export function TalkingBuddy() {
 
   // ACTION: Start Queue
   const startConnection = async (selectedRole: UserRole) => {
-    if (!userId) {
+    if (!userId || !selectedRole) {
       setError("You must be logged in.");
       return;
     }
@@ -546,7 +546,7 @@ export function TalkingBuddy() {
                 value={inputMessage} 
                 disabled={status === 'ended'}
                 onChange={(e) => setInputMessage(e.target.value)} 
-                onKeyPress={(e) => e.key === "Enter" && sendMessage()} 
+                onKeyDown={(e) => e.key === "Enter" && sendMessage()}
                 className="flex-1 text-sm md:text-base rounded-xl" 
                 style={{ borderColor: 'var(--theme-primary)', backgroundColor: 'var(--theme-card-bg)', color: 'var(--theme-text)' }} 
             />
