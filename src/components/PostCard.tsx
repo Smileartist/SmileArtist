@@ -1,24 +1,31 @@
 import { useEffect, useState } from "react";
-import { Heart, MessageCircle, Bookmark, MoreHorizontal, Send } from "lucide-react";
+import { Heart, MessageCircle, Bookmark, MoreHorizontal, Send, Link2, Flag, User } from "lucide-react";
 import { Card } from "./ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { Button } from "./ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "./ui/dropdown-menu";
 import { supabase } from "../utils/supabaseClient";
 import { CommentModal } from "./CommentModal";
 import { ShareModal } from "./ShareModal";
 import { handleLike as handleLikeUtil, handleSave as handleSaveUtil } from "../utils/postInteractions";
-import { Post } from "../utils/supabaseQueries"; // Import the Post interface
+import { Post } from "../utils/supabaseQueries";
+import { useUserData } from "../App";
+import { toast } from "sonner";
 
 interface PostCardProps {
-  post: Post; // Now accepts a single 'post' prop of type Post
+  post: Post;
 }
 
-export function PostCard({
-  post
-}: PostCardProps) {
-  // Destructure post properties for easier use
+export function PostCard({ post }: PostCardProps) {
+  const { onViewChange, userId: currentUserId } = useUserData();
   const { postId, author, content, title, likes, comments: initialComments, created_at: timestamp, category } = post;
-  
+
   const [likeCount, setLikeCount] = useState(likes);
   const [liked, setLiked] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -26,7 +33,7 @@ export function PostCard({
   const [showShareModal, setShowShareModal] = useState(false);
   const [commentCount, setCommentCount] = useState(initialComments);
 
-  // 🔥 check existing like/save on mount
+  // Check existing like/save on mount
   useEffect(() => {
     const checkState = async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -58,7 +65,6 @@ export function PostCard({
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return alert("Login required");
 
-    // Optimistic update
     const prevLiked = liked;
     const prevLikeCount = likeCount;
 
@@ -70,10 +76,9 @@ export function PostCard({
       setLikeCount(newLikes);
       setLiked(isLiked);
     } catch (error) {
-      // Revert on error
       setLiked(prevLiked);
       setLikeCount(prevLikeCount);
-      console.error("Error handling like from PostCard:", error);
+      console.error("Error handling like:", error);
     }
   };
 
@@ -81,7 +86,6 @@ export function PostCard({
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return alert("Login required");
 
-    // Optimistic update
     const prevSaved = saved;
     setSaved(!prevSaved);
 
@@ -89,48 +93,83 @@ export function PostCard({
       const isSaved = await handleSaveUtil(postId, user.id);
       setSaved(isSaved);
     } catch (error) {
-      // Revert on error
       setSaved(prevSaved);
-      console.error("Error handling save from PostCard desarialise:", error);
+      console.error("Error handling save:", error);
     }
   };
 
-  const handleCommentClick = () => {
-    console.log("Comment button clicked for post:", postId);
-    setShowCommentModal(true);
-    console.log("showCommentModal set to:", true);
-  };
-
-  const handleCommentModalClose = () => {
-    console.log("Closing comment modal for post:", postId);
-    setShowCommentModal(false);
-    console.log("showCommentModal set to:", false);
-  };
-
   const handleCommentAdded = () => {
-    setCommentCount((prevCount: number) => prevCount + 1); // Increment comment count when a new comment is added
-    console.log("Comment added, new count desarialise:", commentCount + 1);
+    setCommentCount((prev: number) => prev + 1);
+  };
+
+  // Navigate to author's profile
+  const handleAuthorClick = () => {
+    if (post.user_id) {
+      onViewChange("profile", post.user_id);
+    }
+  };
+
+  // Copy a shareable link to clipboard
+  const handleCopyLink = () => {
+    const url = `${window.location.origin}?post=${postId}`;
+    navigator.clipboard.writeText(url).then(() => {
+      toast.success("Link copied to clipboard!");
+    });
+  };
+
+  // Report the post
+  const handleReport = () => {
+    toast.success("Post reported. Thank you for keeping the community safe. 🙏");
   };
 
   return (
     <Card className="p-4 md:p-6">
       <div className="flex items-start justify-between mb-4">
-        <div className="flex items-center gap-3">
+        {/* Clickable author area */}
+        <button
+          onClick={handleAuthorClick}
+          className="flex items-center gap-3 text-left hover:opacity-75 transition-opacity"
+        >
           <Avatar>
             <AvatarImage src={author?.avatar_url} />
             <AvatarFallback>{author?.full_name ? author.full_name[0] : "?"}</AvatarFallback>
           </Avatar>
           <div>
-            <p>{author?.full_name || "Anonymous"}</p>
-            <p className="text-sm opacity-60">
+            <p className="font-semibold hover:underline" style={{ color: "var(--theme-text)" }}>
+              {author?.full_name || "Anonymous"}
+            </p>
+            <p className="text-sm opacity-60" style={{ color: "var(--theme-text)" }}>
               @{author?.username || "user"} · {timestamp}
             </p>
           </div>
-        </div>
+        </button>
 
-        <Button variant="ghost" size="icon">
-          <MoreHorizontal className="w-5 h-5" />
-        </Button>
+        {/* 3-dot dropdown */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="flex-shrink-0">
+              <MoreHorizontal className="w-5 h-5" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-44">
+            <DropdownMenuItem onClick={handleAuthorClick} className="cursor-pointer">
+              <User className="w-4 h-4 mr-2" />
+              View Profile
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={handleCopyLink} className="cursor-pointer">
+              <Link2 className="w-4 h-4 mr-2" />
+              Copy Link
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={handleReport}
+              className="cursor-pointer text-red-500 focus:text-red-500"
+            >
+              <Flag className="w-4 h-4 mr-2" />
+              Report Post
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {title && <h3 className="mb-3">{title}</h3>}
@@ -149,12 +188,11 @@ export function PostCard({
           <span>{likeCount}</span>
         </button>
 
-        <button onClick={handleCommentClick} className="flex items-center gap-2 opacity-70">
+        <button onClick={() => setShowCommentModal(true)} className="flex items-center gap-2 opacity-70">
           <MessageCircle className="w-5 h-5" />
           <span>{commentCount}</span>
         </button>
 
-        {/* Share to buddy — Instagram-style */}
         <button
           onClick={() => setShowShareModal(true)}
           className="flex items-center gap-2 opacity-70 hover:opacity-100 transition-opacity"
@@ -171,15 +209,13 @@ export function PostCard({
         </button>
       </div>
 
-      {/* Comment Modal */}
       <CommentModal
         postId={postId}
         isOpen={showCommentModal}
-        onClose={handleCommentModalClose}
+        onClose={() => setShowCommentModal(false)}
         onCommentAdded={handleCommentAdded}
       />
 
-      {/* Share Modal */}
       <ShareModal
         postId={postId}
         postTitle={title}

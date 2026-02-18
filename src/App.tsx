@@ -26,12 +26,14 @@ export const UserDataContext = createContext<{
   userId: string;
   refreshAvatar: () => Promise<void>;
   refreshUserData: () => Promise<void>;
+  onViewChange: (view: string, userId?: string | null) => void;
 }>({
   avatarUrl: null,
   username: "",
   userId: "",
   refreshAvatar: async () => {},
   refreshUserData: async () => {},
+  onViewChange: () => {},
 });
 
 export const useUserData = () => useContext(UserDataContext);
@@ -220,7 +222,7 @@ function AppContent() {
   };
 
   return (
-    <UserDataContext.Provider value={{ avatarUrl, username, userId, refreshAvatar, refreshUserData }}>
+    <UserDataContext.Provider value={{ avatarUrl, username, userId, refreshAvatar, refreshUserData, onViewChange: handleViewChange }}>
       <div 
         className="min-h-screen transition-colors duration-300"
         style={{
