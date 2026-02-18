@@ -11,7 +11,9 @@ import { supabase } from "../utils/supabaseClient";
 // ✅ FIXED IMPORT: Now pointing to the correct file name
 import { 
   findBuddyMatch, 
-  sendBuddyMessage, 
+  sendBuddyMessage,
+  sendBuddyMessageRpc,
+  getBuddyMessages,
   sendBuddyRequest, 
   acceptBuddyRequest, 
   cancelMatchmaking 
@@ -45,10 +47,17 @@ export function TalkingBuddy() {
   const [userId, setUserId] = useState<string | null>(null);
   const [otherUserId, setOtherUserId] = useState<string | null>(null);
   
+  // channel ready flag so we only send broadcast when SUBSCRIBED
+  const [channelReady, setChannelReady] = useState(false);
+
   // Refs for subscriptions and scrolling
-  const chatChannelRef = useRef<any>(null);
+  const chatChannelRef = useRef<any>(null);    // Broadcast-only channel (never blocked by RLS)
+  const msgChangesRef = useRef<any>(null);     // postgres_changes on messages (separate so failures don't affect Broadcast)
   const matchChannelRef = useRef<any>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  // Queue broadcasts sent before the channel is SUBSCRIBED — flushed on SUBSCRIBED
+  const pendingBroadcastsRef = useRef<Array<{ type: string; event: string; payload: any }>>([]);
+  const channelReadyRef = useRef(false);       // ref mirror of channelReady (no stale-closure)
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -125,107 +134,176 @@ export function TalkingBuddy() {
     };
   }, [userId, status]);
 
-  // 3. LOGIC: CONNECTED (Chatting & Requests)
+  // 3. LOGIC: CONNECTED — 3 independent delivery paths for maximum reliability:
+  //   A. Realtime BROADCAST    — instant, but subject to subscription timing race
+  //   B. postgres_changes INSERT on messages — near-real-time (enable Realtime for messages table in Supabase dashboard)
+  //   C. DB polling every 2 s  — guaranteed fallback once SQL functions are deployed
   useEffect(() => {
     if (!userId || status !== "connected" || !sessionId) return;
 
+    setChannelReady(false);
+
+    // Helper: merge incoming DB rows into local state (deduplicates by id)
+    const mergeDbMessages = (dbRows: Array<{ id: string; sender_id: string; content: string; created_at: string }>) => {
+      setMessages((prev) => {
+        const existingIds = new Set(
+          prev.filter((m) => !m.id.startsWith("temp_") && !m.id.startsWith("welcome_") && !m.id.startsWith("sys_") && !m.id.startsWith("msg_")).map((m) => m.id)
+        );
+        const newOnes: Message[] = [];
+        for (const m of dbRows) {
+          if (existingIds.has(m.id)) continue;
+          if (m.sender_id === userId) continue; // own messages shown optimistically
+          newOnes.push({ id: m.id, text: m.content, sender: "other", senderId: m.sender_id, timestamp: new Date(m.created_at).getTime() });
+        }
+        if (newOnes.length === 0) return prev;
+        setOtherUserId((prevId) => prevId ?? newOnes[0].senderId);
+        return [...prev, ...newOnes].sort((a, b) => a.timestamp - b.timestamp);
+      });
+    };
+
+    // ── Channel A: BROADCAST-ONLY ──────────────────────────────────────────────
+    // CRITICAL: Never mix postgres_changes + broadcast on the same channel.
+    // If the messages table has RLS enabled, adding postgres_changes to this channel
+    // will cause the ENTIRE channel (including Broadcast) to fail to subscribe.
     chatChannelRef.current = supabase
-      .channel(`active_chat:${sessionId}`)
-      // A. Listen for Messages
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "messages",
-          filter: `chat_id=eq.${sessionId}`,
-        },
-        (payload) => {
-          const newMsg = payload.new;
-          if (newMsg.sender_id !== userId) {
-            setMessages((prev) => [
-              ...prev,
-              {
-                id: newMsg.id,
-                text: newMsg.content,
-                sender: "other",
-                senderId: newMsg.sender_id,
-                timestamp: new Date(newMsg.created_at).getTime(),
-              },
-            ]);
-          }
+      .channel(`buddy_chat_room:${sessionId}`)
+      // 1. Receive partner's new messages instantly
+      .on("broadcast", { event: "new_message" }, (payload) => {
+        const msg = payload.payload as { id: string; text: string; senderId: string; timestamp: number };
+        if (msg.senderId === userId) return;
+        setOtherUserId((prev) => prev ?? msg.senderId);
+        setMessages((prev) => {
+          if (prev.some((m) => m.id === msg.id)) return prev;
+          return [...prev, { id: msg.id, text: msg.text, sender: "other", senderId: msg.senderId, timestamp: msg.timestamp }];
+        });
+      })
+      // 2. Incoming buddy/save request
+      .on("broadcast", { event: "buddy_request" }, (payload) => {
+        const { fromUser } = payload.payload as { fromUser: string };
+        if (fromUser !== userId) {
+          setOtherUserId((prev) => prev ?? fromUser);
+          setFriendRequestReceived(true);
         }
-      )
-      // B. Listen for Buddy Requests (Incoming)
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "buddy_requests",
-          filter: `to_user=eq.${userId}`, 
-        },
-        (payload) => {
-           if (payload.new.chat_id === sessionId && payload.new.status === 'pending') {
-               setFriendRequestReceived(true);
-           }
+      })
+      // 3. Buddy request response (accepted/declined)
+      .on("broadcast", { event: "buddy_response" }, (payload) => {
+        const { responseStatus } = payload.payload as { responseStatus: string };
+        if (responseStatus === "accepted") {
+          setFriendsAdded(true);
+          setMessages((prev) => [...prev, { id: `sys_acc_${Date.now()}`, text: "🎉 Connection request accepted! Chat saved.", sender: "other", senderId: "system", timestamp: Date.now() }]);
+        } else if (responseStatus === "declined") {
+          setMessages((prev) => [...prev, { id: `sys_dec_${Date.now()}`, text: "Request declined.", sender: "other", senderId: "system", timestamp: Date.now() }]);
+          setFriendRequestSent(false);
         }
-      )
-      // C. Listen for Updates (Accepted/Declined requests)
-      .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "buddy_requests",
-          filter: `from_user=eq.${userId}`, // I sent the request
-        },
-        (payload) => {
-           if (payload.new.status === 'accepted') {
-               setFriendsAdded(true);
-               setMessages((prev) => [...prev, { id: `sys_acc_${Date.now()}`, text: "🎉 Connection request accepted! Chat saved.", sender: "other", senderId: "system", timestamp: Date.now() }]);
-           } else if (payload.new.status === 'declined') {
-               setMessages((prev) => [...prev, { id: `sys_dec_${Date.now()}`, text: "Request declined.", sender: "other", senderId: "system", timestamp: Date.now() }]);
-               setFriendRequestSent(false); 
-           }
+      })
+      .subscribe((chStatus, err) => {
+        console.log("[TalkingBuddy] Broadcast channel:", chStatus, err ?? "");
+        const ready = chStatus === "SUBSCRIBED";
+        setChannelReady(ready);
+        channelReadyRef.current = ready;
+        if (ready && pendingBroadcastsRef.current.length > 0) {
+          // Flush messages that were sent before the channel was ready
+          console.log(`[TalkingBuddy] Flushing ${pendingBroadcastsRef.current.length} pending broadcast(s)`);
+          pendingBroadcastsRef.current.forEach((msg) => chatChannelRef.current?.send(msg));
+          pendingBroadcastsRef.current = [];
         }
-      )
-      .subscribe();
+      });
+
+    // ── Channel B: postgres_changes for messages (SEPARATE — fails gracefully) ─
+    // This fires when a message is inserted into the DB, giving near-real-time
+    // delivery even if broadcast was missed.
+    // Requires: Realtime enabled for `messages` table in Supabase Dashboard →
+    //   Database → Replication → tables → toggle messages ON.
+    // If this channel fails (RLS or Realtime not enabled), it silently fails
+    // WITHOUT affecting Channel A (Broadcast).
+    msgChangesRef.current = supabase
+      .channel(`buddy_msg_changes:${sessionId}`)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages", filter: `chat_id=eq.${sessionId}` }, (payload) => {
+        const m = payload.new as { id: string; chat_id: string; sender_id: string; content: string; is_read: boolean; created_at: string };
+        if (m.sender_id === userId) return;
+        setOtherUserId((prev) => prev ?? m.sender_id);
+        setMessages((prev) => {
+          if (prev.some((msg) => msg.id === m.id)) return prev;
+          return [...prev, { id: m.id, text: m.content, sender: "other", senderId: m.sender_id, timestamp: new Date(m.created_at).getTime() }];
+        });
+      })
+      .subscribe((chStatus, err) => {
+        console.log("[TalkingBuddy] postgres_changes channel:", chStatus, err ?? "");
+      });
+
+    // D. Polling fallback (every 2 s) — catches anything missed by Broadcast or postgres_changes.
+    // Primary:  getBuddyMessages RPC (SECURITY DEFINER — bypasses RLS entirely)
+    //           Requires send_buddy_message + get_buddy_messages from DATABASE_SOURCE_OF_TRUTH.sql
+    //           to be run in Supabase SQL Editor.
+    // Fallback: direct SELECT from messages (works only if RLS allows it / disabled)
+    const msgPollInterval = setInterval(async () => {
+      if (!sessionId || !userId) return;
+      try {
+        // Try SECURITY DEFINER RPC first
+        const data = await getBuddyMessages(sessionId, userId);
+        if (data && data.length > 0) mergeDbMessages(data);
+      } catch {
+        // RPC not deployed yet — fall back to direct SELECT
+        try {
+          const { data: rows } = await supabase
+            .from("messages")
+            .select("id, sender_id, content, created_at")
+            .eq("chat_id", sessionId)
+            .order("created_at", { ascending: true });
+          if (rows && rows.length > 0) mergeDbMessages(rows as any);
+        } catch {
+          // Both failed — Realtime broadcast is sole delivery path until SQL is deployed
+        }
+      }
+    }, 2000);
 
     return () => {
+      clearInterval(msgPollInterval);
+      setChannelReady(false);
       if (chatChannelRef.current) supabase.removeChannel(chatChannelRef.current);
+      if (msgChangesRef.current) supabase.removeChannel(msgChangesRef.current);
     };
   }, [userId, status, sessionId]);
 
 
-  // HELPER: Fetch other participant details when match is found
-  const handleMatchFound = async (chatId: string) => {
-      // Fetch the OTHER participant ID
-      const { data: participants, error } = await supabase
-        .from('chat_participants')
-        .select('user_id')
-        .eq('chat_id', chatId)
-        .neq('user_id', userId); 
+  // HELPER: Handle match found — connect immediately, discover partner ID lazily.
+  // `resolvedRole` is passed explicitly to avoid stale closure when called from
+  // startConnection() where React state (role) hasn't updated yet.
+  const handleMatchFound = async (chatId: string, resolvedRole?: UserRole) => {
+      const effectiveRole = resolvedRole ?? role;
 
-      if (error || !participants || participants.length === 0) {
-          console.error("Match found but could not identify partner");
-          return;
-      }
-
-      setOtherUserId(participants[0].user_id);
+      // Connect right away so the user isn't stuck on the waiting screen
       setSessionId(chatId);
       setStatus("connected");
-      
-      // Cleanup Queue (Best effort)
-      if(userId) {
+
+      // Cleanup Queue (Best effort - may already be removed by RPC)
+      if (userId) {
           try { await cancelMatchmaking(userId); } catch(e) { /* ignore if already gone */ }
       }
 
-      // System Welcome Message
+      // Try to pre-fetch the OTHER participant's ID.
+      // This may fail if Supabase RLS only allows users to see their own row in
+      // chat_participants. If it fails, otherUserId will be discovered lazily from
+      // the first incoming message (see the message listener below).
+      try {
+          const { data: participants } = await supabase
+            .from('chat_participants')
+            .select('user_id')
+            .eq('chat_id', chatId)
+            .neq('user_id', userId);
+
+          if (participants && participants.length > 0) {
+              setOtherUserId(participants[0].user_id);
+          }
+      } catch (e) {
+          console.log("Could not pre-fetch partner ID; will detect from first message.");
+      }
+
+      // System Welcome Message — use effectiveRole to avoid stale-closure wrong message
       setMessages([{
         id: `welcome_${Date.now()}`,
-        text: role === "seeker" 
-            ? "You are now connected with a Listener. This is a safe space." 
+        text: effectiveRole === "seeker"
+            ? "You are now connected with a Listener. This is a safe space."
             : "You are now connected with a Seeker. Please listen with empathy.",
         sender: "other",
         senderId: "system",
@@ -253,7 +331,8 @@ export function TalkingBuddy() {
         
         // 2. If the RPC returns a chat_id immediately
         if (matchId) {
-            await handleMatchFound(matchId);
+            // Pass selectedRole explicitly — React state (role) may not be updated yet
+            await handleMatchFound(matchId, selectedRole);
         } else {
             // 3. If no immediate match, insert into queue and wait
             const { error: queueError } = await supabase
@@ -270,66 +349,114 @@ export function TalkingBuddy() {
     }
   };
 
-  // ACTION: Send Message
+  // ACTION: Send Message — broadcast for instant delivery + DB insert for persistence
   const sendMessage = async () => {
     if (!inputMessage.trim() || !sessionId || !userId) return;
 
     const textToSend = inputMessage;
-    setInputMessage(""); // Optimistic clear
+    setInputMessage("");
 
-    // Optimistic UI
-    const tempId = `temp_${Date.now()}`;
+    const msgId = `msg_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const timestamp = Date.now();
+
+    // Optimistic UI (show on sender's screen immediately)
     setMessages((prev) => [...prev, {
-      id: tempId,
+      id: msgId,
       text: textToSend,
       sender: "me",
       senderId: userId,
-      timestamp: Date.now(),
+      timestamp,
     }]);
 
+    // Broadcast to partner — queue if channel not yet SUBSCRIBED (prevents silent drop)
+    const broadcastMsg = { type: "broadcast", event: "new_message", payload: { id: msgId, text: textToSend, senderId: userId, timestamp } };
+    if (channelReadyRef.current && chatChannelRef.current) {
+      chatChannelRef.current.send(broadcastMsg);
+    } else {
+      // Channel still subscribing — queue and deliver once SUBSCRIBED
+      pendingBroadcastsRef.current.push(broadcastMsg);
+    }
+
+    // Persist to DB via SECURITY DEFINER RPC (bypasses RLS).
+    // Falls back to direct insert if RPC not deployed yet.
     try {
+      await sendBuddyMessageRpc(sessionId, userId, textToSend);
+    } catch (rpcErr) {
+      console.warn("RPC persist failed, trying direct insert:", rpcErr);
+      try {
         await sendBuddyMessage(sessionId, userId, textToSend);
-    } catch (err) {
-        console.error("Message failed");
+      } catch (directErr) {
+        console.error("DB persist failed completely:", directErr);
+      }
     }
   };
 
-  // ACTION: Friend/Buddy Requests
+  // ACTION: Friend/Buddy Requests — broadcast + DB
   const sendFriendReq = async () => {
-    if (!userId || !otherUserId || !sessionId) return;
+    if (!userId || !sessionId) return;
     setFriendRequestSent(true);
 
-    try {
+    // Broadcast the request to partner
+    chatChannelRef.current?.send({
+      type: "broadcast",
+      event: "buddy_request",
+      payload: { fromUser: userId },
+    });
+
+    // Also persist to DB if we know otherUserId
+    if (otherUserId) {
+      try {
         await sendBuddyRequest(sessionId, userId, otherUserId);
-    } catch (err) {
-        setFriendRequestSent(false);
-        setError("Could not send request.");
+      } catch (err) {
+        console.error("DB buddy_request persist failed");
+      }
     }
   };
 
   const acceptFriendReq = async () => {
-    if (!userId || !otherUserId || !sessionId) return;
+    if (!userId || !sessionId) return;
 
-    try {
+    setFriendsAdded(true);
+    setFriendRequestReceived(false);
+
+    // Broadcast acceptance
+    chatChannelRef.current?.send({
+      type: "broadcast",
+      event: "buddy_response",
+      payload: { responseStatus: "accepted" },
+    });
+
+    // Also update DB if we have the required IDs
+    if (otherUserId) {
+      try {
         await acceptBuddyRequest(sessionId, userId, otherUserId);
-        setFriendsAdded(true);
-        setFriendRequestReceived(false);
-    } catch (err) {
-        console.error("Accept Error", err);
-        setError("Failed to accept request.");
+      } catch (err) {
+        console.error("DB accept_buddy persist failed");
+      }
     }
   };
 
   const declineFriendReq = async () => {
     if (!userId || !sessionId) return;
     setFriendRequestReceived(false);
-    
-    // Direct Supabase call for decline (simple update)
-    await supabase
+
+    // Broadcast decline
+    chatChannelRef.current?.send({
+      type: "broadcast",
+      event: "buddy_response",
+      payload: { responseStatus: "declined" },
+    });
+
+    // Also update DB (best effort)
+    try {
+      await supabase
         .from("buddy_requests")
-        .update({ status: 'declined' })
-        .eq('chat_id', sessionId)
-        .eq('to_user', userId);
+        .update({ status: "declined" })
+        .eq("chat_id", sessionId)
+        .eq("to_user", userId);
+    } catch (err) {
+      console.error("DB decline persist failed");
+    }
   };
 
   // ACTION: End Connection

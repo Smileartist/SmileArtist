@@ -361,6 +361,78 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 
+-- ========================
+-- RLS POLICIES FOR MESSAGES
+-- (Run these in Supabase SQL Editor — simpler than the SECURITY DEFINER RPCs)
+-- ========================
+
+-- Allow authenticated users to INSERT their own messages
+ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "users can insert own messages" ON messages
+  FOR INSERT TO authenticated
+  WITH CHECK (sender_id = auth.uid());
+
+-- Allow chat participants to SELECT messages in their chats
+CREATE POLICY "chat participants can view messages" ON messages
+  FOR SELECT TO authenticated
+  USING (
+    chat_id IN (
+      SELECT chat_id FROM chat_participants WHERE user_id = auth.uid()
+    )
+  );
+
+
+-- send_buddy_message: inserts a message into a chat the user participates in.
+-- Uses SECURITY DEFINER to bypass RLS on the messages table.
+CREATE OR REPLACE FUNCTION send_buddy_message(p_chat_id uuid, p_user_id uuid, p_content text)
+RETURNS void AS $$
+BEGIN
+  -- Security check: user must be a participant in this chat
+  IF NOT EXISTS (
+    SELECT 1 FROM chat_participants
+    WHERE chat_participants.chat_id = p_chat_id
+      AND chat_participants.user_id = p_user_id
+  ) THEN
+    RAISE EXCEPTION 'User is not a participant in this chat';
+  END IF;
+
+  INSERT INTO messages (chat_id, sender_id, content)
+  VALUES (p_chat_id, p_user_id, p_content);
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+
+-- get_buddy_messages: returns all messages for a chat if the requesting user is a participant.
+-- Uses SECURITY DEFINER to bypass RLS on the messages table.
+CREATE OR REPLACE FUNCTION get_buddy_messages(p_chat_id uuid, p_user_id uuid)
+RETURNS TABLE(
+  id uuid,
+  chat_id uuid,
+  sender_id uuid,
+  content text,
+  is_read boolean,
+  created_at timestamptz
+) AS $$
+BEGIN
+  -- Security check: user must be a participant in this chat
+  IF NOT EXISTS (
+    SELECT 1 FROM chat_participants
+    WHERE chat_participants.chat_id = p_chat_id
+      AND chat_participants.user_id = p_user_id
+  ) THEN
+    RETURN; -- Return empty set if not a participant
+  END IF;
+
+  RETURN QUERY
+  SELECT m.id, m.chat_id, m.sender_id, m.content, m.is_read, m.created_at
+  FROM messages m
+  WHERE m.chat_id = p_chat_id
+  ORDER BY m.created_at ASC;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+
 -- accept_buddy_request: marks the buddy_request as accepted
 -- and makes the chat permanent (removes expiry).
 CREATE OR REPLACE FUNCTION accept_buddy_request(p_chat_id uuid, p_user_a uuid, p_user_b uuid)

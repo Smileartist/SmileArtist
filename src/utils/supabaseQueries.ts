@@ -262,6 +262,22 @@ export const sendBuddyMessage = async (chatId: string, userId: string, content: 
   }
 };
 
+// sendBuddyMessageRpc: calls the SECURITY DEFINER RPC 'send_buddy_message'
+// which bypasses RLS on the messages table.
+// Run the SQL in DATABASE_SOURCE_OF_TRUTH.sql in Supabase SQL Editor first.
+export const sendBuddyMessageRpc = async (chatId: string, userId: string, content: string) => {
+  const { error } = await supabase.rpc("send_buddy_message", {
+    p_chat_id: chatId,
+    p_user_id: userId,
+    p_content: content,
+  });
+
+  if (error) {
+    console.error("sendBuddyMessageRpc error:", error);
+    throw error;
+  }
+};
+
 export const getChatMessages = async (chatId: string) => {
   const { data, error } = await supabase
     .from("messages")
@@ -274,6 +290,29 @@ export const getChatMessages = async (chatId: string) => {
     throw error;
   }
   return data;
+};
+
+// getBuddyMessages: calls the SECURITY DEFINER RPC 'get_buddy_messages'
+// which bypasses RLS and returns all messages for a chat the user participates in.
+// Run the SQL in DATABASE_SOURCE_OF_TRUTH.sql in Supabase SQL Editor first.
+export const getBuddyMessages = async (chatId: string, userId: string) => {
+  const { data, error } = await supabase.rpc("get_buddy_messages", {
+    p_chat_id: chatId,
+    p_user_id: userId,
+  });
+
+  if (error) {
+    console.error("getBuddyMessages RPC error:", error);
+    throw error;
+  }
+  return data as Array<{
+    id: string;
+    chat_id: string;
+    sender_id: string;
+    content: string;
+    is_read: boolean;
+    created_at: string;
+  }>;
 };
 
 export const sendBuddyRequest = async (chatId: string, fromUser: string, toUser: string) => {
