@@ -61,12 +61,21 @@ function AppContent() {
   useEffect(() => {
 
     const getSession = async () => {
-      const { data, error } = await supabase.auth.getSession();
+      const { data } = await supabase.auth.getSession();
       if (data.session) {
         const user = data.session.user;
-        setUserId(user.id);
-        setIsLoggedIn(true);
-        fetchProfileData(user.id);
+        // Only restore session if the user has completed profile setup (has a username)
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("username")
+          .eq("id", user.id)
+          .maybeSingle();
+        if (profile?.username) {
+          setUserId(user.id);
+          setIsLoggedIn(true);
+          fetchProfileData(user.id);
+        }
+        // else: incomplete signup — stay on login screen
       } else {
         setIsLoggedIn(false);
         setUsername("");
@@ -76,13 +85,11 @@ function AppContent() {
     getSession();
 
     const { data: authListener } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        if (session) {
-          const user = session.user;
-          setUserId(user.id);
-          setIsLoggedIn(true);
-          fetchProfileData(user.id);
-        } else {
+      (event, session) => {
+        // Only handle sign-out here.
+        // Login (both new signup and returning login) is handled explicitly via handleLogin().
+        // Session restore on page load is handled by getSession() above.
+        if (event === "SIGNED_OUT" || !session) {
           setIsLoggedIn(false);
           setUsername("");
           setUserId("");
