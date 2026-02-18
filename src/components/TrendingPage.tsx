@@ -5,7 +5,11 @@ import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { getTrendingPosts, getTrendingAuthors, getTrendingTopics } from "../utils/supabaseQueries";
 
-export function TrendingPage() {
+interface TrendingPageProps {
+  onViewChange?: (view: string, userId?: string | null) => void;
+}
+
+export function TrendingPage({ onViewChange }: TrendingPageProps) {
   const [timeFilter, setTimeFilter] = useState<"today" | "week" | "month" | "all">("today");
   const [trendingPosts, setTrendingPosts] = useState<any[]>([]);
   const [trendingAuthors, setTrendingAuthors] = useState<any[]>([]);
@@ -171,13 +175,16 @@ export function TrendingPage() {
                       {index + 1}
                     </div>
                     <img 
-                      src={author.avatar || "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100&h=100&fit=crop"} 
-                      alt={author.name}
+                      src={author.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(author.full_name)}&background=random`}
+                      alt={author.full_name}
                       className="w-10 h-10 rounded-full object-cover"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(author.full_name)}&background=random`;
+                      }}
                     />
                     <div className="flex-1 min-w-0">
                       <p className="truncate" style={{ color: 'var(--theme-text)' }}>
-                        <strong>{author.name}</strong>
+                        <strong>{author.full_name}</strong>
                       </p>
                       <p className="text-sm truncate" style={{ color: 'var(--theme-text)', opacity: 0.6 }}>
                         {author.posts_count} posts
@@ -186,12 +193,13 @@ export function TrendingPage() {
                     <Button 
                       size="sm"
                       className="rounded-lg"
+                      onClick={() => onViewChange?.("profile", author.id)}
                       style={{
                         backgroundColor: 'var(--theme-primary)',
                         color: 'white',
                       }}
                     >
-                      Follow
+                      View Profile
                     </Button>
                   </div>
                 ))

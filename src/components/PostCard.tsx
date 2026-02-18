@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
-import { Heart, MessageCircle, Bookmark, MoreHorizontal } from "lucide-react";
+import { Heart, MessageCircle, Bookmark, MoreHorizontal, Send } from "lucide-react";
 import { Card } from "./ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { Button } from "./ui/button";
 import { supabase } from "../utils/supabaseClient";
-import { CommentModal } from "./CommentModal"; // Import the CommentModal
+import { CommentModal } from "./CommentModal";
+import { ShareModal } from "./ShareModal";
 import { handleLike as handleLikeUtil, handleSave as handleSaveUtil } from "../utils/postInteractions";
 import { Post } from "../utils/supabaseQueries"; // Import the Post interface
 
@@ -21,7 +22,8 @@ export function PostCard({
   const [likeCount, setLikeCount] = useState(likes);
   const [liked, setLiked] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [showCommentModal, setShowCommentModal] = useState(false); // State for comment modal visibility
+  const [showCommentModal, setShowCommentModal] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
   const [commentCount, setCommentCount] = useState(initialComments);
 
   // 🔥 check existing like/save on mount
@@ -147,9 +149,17 @@ export function PostCard({
           <span>{likeCount}</span>
         </button>
 
-        <button onClick={handleCommentClick} className="flex items-center gap-2 opacity-70"> {/* Added onClick handler */}
+        <button onClick={handleCommentClick} className="flex items-center gap-2 opacity-70">
           <MessageCircle className="w-5 h-5" />
           <span>{commentCount}</span>
+        </button>
+
+        {/* Share to buddy — Instagram-style */}
+        <button
+          onClick={() => setShowShareModal(true)}
+          className="flex items-center gap-2 opacity-70 hover:opacity-100 transition-opacity"
+        >
+          <Send className="w-5 h-5" />
         </button>
 
         <button onClick={handleSave} className="ml-auto">
@@ -167,6 +177,15 @@ export function PostCard({
         isOpen={showCommentModal}
         onClose={handleCommentModalClose}
         onCommentAdded={handleCommentAdded}
+      />
+
+      {/* Share Modal */}
+      <ShareModal
+        postId={postId}
+        postTitle={title}
+        postContent={content}
+        isOpen={showShareModal}
+        onClose={() => setShowShareModal(false)}
       />
     </Card>
   );

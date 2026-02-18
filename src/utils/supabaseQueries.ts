@@ -21,6 +21,7 @@ export interface Post {
 }
 
 interface TrendingAuthor {
+  id: string;
   full_name: string;
   username: string;
   avatar_url: string;
@@ -158,7 +159,7 @@ export const getTrendingAuthors = async (timeFilter: "today" | "week" | "month" 
     return [];
   }
 
-  const authorStats: { [key: string]: { full_name: string; username: string; avatar_url: string; posts_count: number; total_likes: number } } = {};
+  const authorStats: { [key: string]: { id: string; full_name: string; username: string; avatar_url: string; posts_count: number; total_likes: number } } = {};
 
   (postsDataRaw as any[]).forEach(post => {
     const author = Array.isArray(post.author) ? post.author[0] : post.author;
@@ -167,6 +168,7 @@ export const getTrendingAuthors = async (timeFilter: "today" | "week" | "month" 
       const authorId = post.user_id;
       if (!authorStats[authorId]) {
         authorStats[authorId] = {
+          id: authorId,
           full_name: author.full_name,
           username: author.username,
           avatar_url: author.avatar_url,

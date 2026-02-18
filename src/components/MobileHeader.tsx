@@ -20,12 +20,12 @@ export function MobileHeader({ onMenuClick, onViewChange, activeView }: MobileHe
         borderColor: 'var(--theme-primary)' + '33',
       }}
     >
-      <div className="grid grid-cols-3 items-center px-4 py-3">
+      <div className="grid grid-cols-3 items-center px-4 py-2">
         <div className="flex items-center gap-2">
           <Button
             variant="ghost"
             size="icon"
-            className="h-9 w-9"
+            className="h-11 w-11"
             onClick={() => onViewChange?.("write")}
             style={{
               color: 'var(--theme-primary)',
@@ -37,14 +37,14 @@ export function MobileHeader({ onMenuClick, onViewChange, activeView }: MobileHe
               e.currentTarget.style.backgroundColor = 'transparent';
             }}
           >
-            <PenTool className="w-5 h-5" />
+            <PenTool className="w-7 h-7" />
           </Button>
         </div>
         <div className="col-start-2 justify-self-center flex items-center gap-2">
           <img 
             src={logo} 
             alt="Smile Artist" 
-            className="h-8 object-contain"
+            className="h-12 object-contain"
           />
         </div>
         <div className="flex items-center gap-2 justify-self-end">
@@ -53,7 +53,7 @@ export function MobileHeader({ onMenuClick, onViewChange, activeView }: MobileHe
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-9 w-9"
+                className="h-11 w-11"
                 onClick={() => onViewChange?.("library")}
                 style={{
                   color: 'var(--theme-primary)',
@@ -65,12 +65,12 @@ export function MobileHeader({ onMenuClick, onViewChange, activeView }: MobileHe
                   e.currentTarget.style.backgroundColor = 'transparent';
                 }}
               >
-                <BookOpen className="w-5 h-5" />
+                <BookOpen className="w-7 h-7" />
               </Button>
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-9 w-9"
+                className="h-11 w-11"
                 onClick={() => onViewChange?.("customize")}
                 style={{
                   color: 'var(--theme-primary)',
@@ -82,12 +82,12 @@ export function MobileHeader({ onMenuClick, onViewChange, activeView }: MobileHe
                   e.currentTarget.style.backgroundColor = 'transparent';
                 }}
               >
-                <Palette className="w-5 h-5" />
+                <Palette className="w-7 h-7" />
               </Button>
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-9 w-9"
+                className="h-11 w-11"
                 onClick={() => onViewChange?.("settings")}
                 style={{
                   color: 'var(--theme-primary)',
@@ -99,14 +99,14 @@ export function MobileHeader({ onMenuClick, onViewChange, activeView }: MobileHe
                   e.currentTarget.style.backgroundColor = 'transparent';
                 }}
               >
-                <SettingsIcon className="w-5 h-5" />
+                <SettingsIcon className="w-7 h-7" />
               </Button>
             </div>
           ) : (
             <Button 
               variant="ghost" 
               size="icon" 
-              className="h-9 w-9"
+              className="h-11 w-11"
               onClick={() => onViewChange?.("notifications")}
               style={{
                 color: 'var(--theme-primary)',
@@ -118,7 +118,7 @@ export function MobileHeader({ onMenuClick, onViewChange, activeView }: MobileHe
                 e.currentTarget.style.backgroundColor = 'transparent';
               }}
             >
-              <Bell className="w-5 h-5" />
+              <Bell className="w-7 h-7" />
             </Button>
           )}
         </div>

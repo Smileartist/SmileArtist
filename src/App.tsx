@@ -134,7 +134,7 @@ function AppContent() {
       case "search":
         return <SearchPanel onViewChange={handleViewChange} />;
       case "trending":
-        return <TrendingPage />;
+        return <TrendingPage onViewChange={handleViewChange} />;
       case "library":
         return <LibraryPage />;
       case "buddy":
