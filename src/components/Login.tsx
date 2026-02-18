@@ -173,18 +173,18 @@ export function Login({ onLogin }: LoginProps) {
               <label className="block text-sm text-[#2d2424] mb-1.5">
                 Password
               </label>
-              <div className="relative">
-                <Input
+              <div className="flex items-center w-full border border-[#d4756f]/20 rounded-xl bg-white px-3 h-10 focus-within:border-[#d4756f] focus-within:ring-1 focus-within:ring-[#d4756f]/30 transition-all">
+                <input
                   type={showPassword ? "text" : "password"}
                   placeholder="Enter your password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full border-[#d4756f]/20 rounded-xl focus:border-[#d4756f] pr-10"
+                  className="flex-1 bg-transparent outline-none text-sm text-[#2d2424] placeholder:text-[#8a7c74]/60 min-w-0"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword((v) => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#8a7c74] hover:text-[#d4756f] transition-colors"
+                  className="ml-2 flex-shrink-0 text-[#8a7c74] hover:text-[#d4756f] transition-colors"
                   tabIndex={-1}
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -197,18 +197,18 @@ export function Login({ onLogin }: LoginProps) {
                 <label className="block text-sm text-[#2d2424] mb-1.5">
                   Confirm Password
                 </label>
-                <div className="relative">
-                  <Input
+                <div className="flex items-center w-full border border-[#d4756f]/20 rounded-xl bg-white px-3 h-10 focus-within:border-[#d4756f] focus-within:ring-1 focus-within:ring-[#d4756f]/30 transition-all">
+                  <input
                     type={showConfirmPassword ? "text" : "password"}
                     placeholder="Confirm your password"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="w-full border-[#d4756f]/20 rounded-xl focus:border-[#d4756f] pr-10"
+                    className="flex-1 bg-transparent outline-none text-sm text-[#2d2424] placeholder:text-[#8a7c74]/60 min-w-0"
                   />
                   <button
                     type="button"
                     onClick={() => setShowConfirmPassword((v) => !v)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#8a7c74] hover:text-[#d4756f] transition-colors"
+                    className="ml-2 flex-shrink-0 text-[#8a7c74] hover:text-[#d4756f] transition-colors"
                     tabIndex={-1}
                   >
                     {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
