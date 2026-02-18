@@ -180,6 +180,35 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
   // Grid post modal
   const [selectedPost, setSelectedPost] = useState<any>(null);
 
+  // Buddies list for the Buddies tab
+  const [buddiesList, setBuddiesList] = useState<any[]>([]);
+  const [buddyCount, setBuddyCount] = useState(0);
+
+  const fetchBuddies = async () => {
+    if (!userId) return;
+    const { data, error } = await supabase
+      .from('buddy_requests')
+      .select('from_user, to_user')
+      .eq('status', 'accepted')
+      .or(`from_user.eq.${userId},to_user.eq.${userId}`);
+
+    if (error || !data) return;
+    setBuddyCount(data.length);
+
+    const profiles = await Promise.all(
+      data.map(async (req: any) => {
+        const otherId = req.from_user === userId ? req.to_user : req.from_user;
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('id, full_name, username, avatar_url')
+          .eq('id', otherId)
+          .maybeSingle();
+        return profile;
+      })
+    );
+    setBuddiesList(profiles.filter(Boolean));
+  };
+
   const [buddyStatus, setBuddyStatus] = useState<null | 'pending_sent' | 'pending_received' | 'accepted'>(null);
   const [buddyRequestId, setBuddyRequestId] = useState<string | null>(null);
   const [buddyLoading, setBuddyLoading] = useState(false);
@@ -287,6 +316,7 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
       checkBuddyStatus();
     }
     fetchFollowData(currentUserId);
+    fetchBuddies();
   }, [currentUserId, userId]);
   // ──────────────────────────────────────────────────────────────
 
@@ -625,6 +655,9 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
                   <span style={{ color: 'var(--theme-text)' }}>
                     <strong>{followerCount}</strong>{" Followers"}
                   </span>
+                  <span style={{ color: 'var(--theme-text)' }}>
+                    <strong>{buddyCount}</strong>{" Buddies"}
+                  </span>
                 </div>
               </>
             ) : (
@@ -804,10 +837,54 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
           </TabsContent>
 
           <TabsContent value="saved">
-            <div className="text-center py-12 bg-[var(--theme-accent)]/10 rounded-3xl">
-              <Users className="w-12 h-12 mx-auto mb-4 opacity-20" style={{ color: 'var(--theme-primary)' }} />
-              <p style={{ color: 'var(--theme-text)', opacity: 0.6 }}>No buddies yet.</p>
-            </div>
+            {buddiesList.length > 0 ? (
+              <div className="space-y-3">
+                {/* Header row */}
+                <p className="text-sm font-semibold mb-4" style={{ color: 'var(--theme-text)', opacity: 0.6 }}>
+                  {buddyCount} {buddyCount === 1 ? 'Buddy' : 'Buddies'}
+                </p>
+                {buddiesList.map((buddy: any) => (
+                  <div
+                    key={buddy.id}
+                    className="flex items-center gap-4 p-4 rounded-2xl transition-shadow hover:shadow-md cursor-pointer"
+                    style={{ backgroundColor: 'var(--theme-card-bg)', border: '1px solid var(--theme-primary)22' }}
+                    onClick={() => onViewChange && onViewChange('profile', buddy.id)}
+                  >
+                    <Avatar className="w-12 h-12 flex-shrink-0">
+                      <AvatarImage
+                        src={buddy.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(buddy.full_name || 'B')}&background=random`}
+                        alt={buddy.full_name}
+                      />
+                      <AvatarFallback style={{ backgroundColor: 'var(--theme-accent)', color: 'var(--theme-primary)' }}>
+                        {(buddy.full_name || 'B').charAt(0)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold truncate" style={{ color: 'var(--theme-text)' }}>
+                        {buddy.full_name || 'Unknown'}
+                      </p>
+                      <p className="text-sm truncate" style={{ color: 'var(--theme-text)', opacity: 0.6 }}>
+                        @{buddy.username || 'user'}
+                      </p>
+                    </div>
+                    <Badge
+                      className="flex-shrink-0 text-xs px-3 py-1 rounded-full"
+                      style={{ backgroundColor: 'var(--theme-accent)', color: 'var(--theme-primary)' }}
+                    >
+                      ❤️ Buddy
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-12 bg-[var(--theme-accent)]/10 rounded-3xl">
+                <Users className="w-12 h-12 mx-auto mb-4 opacity-20" style={{ color: 'var(--theme-primary)' }} />
+                <p style={{ color: 'var(--theme-text)', opacity: 0.6 }}>No buddies yet.</p>
+                <p className="text-sm mt-2" style={{ color: 'var(--theme-text)', opacity: 0.4 }}>
+                  Connect through Talking Buddy or send a buddy request.
+                </p>
+              </div>
+            )}
           </TabsContent>
 
           <TabsContent value="about">
