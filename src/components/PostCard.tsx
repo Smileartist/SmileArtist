@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Heart, MessageCircle, Bookmark, MoreHorizontal, Send, Link2, Flag, User } from "lucide-react";
+import { Heart, MessageCircle, Bookmark, MoreHorizontal, Send, Link2, Flag, User, Share2 } from "lucide-react";
 import { Card } from "./ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import {
@@ -116,6 +116,14 @@ export function PostCard({ post }: PostCardProps) {
     });
   };
 
+  // Share the author's profile link
+  const handleShareProfile = () => {
+    const url = `${window.location.origin}?profile=${post.user_id}`;
+    navigator.clipboard.writeText(url).then(() => {
+      toast.success("Profile link copied to clipboard!");
+    });
+  };
+
   // Report the post
   const handleReport = () => {
     toast.success("Post reported. Thank you for keeping the community safe. 🙏");
@@ -161,6 +169,10 @@ export function PostCard({ post }: PostCardProps) {
             <DropdownMenuItem onClick={handleCopyLink} className="cursor-pointer">
               <Link2 className="w-4 h-4 mr-2" />
               Copy Link
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={handleShareProfile} className="cursor-pointer">
+              <Share2 className="w-4 h-4 mr-2" />
+              Share Profile
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem

@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { useUserData } from "../App";
-import { MapPin, Calendar, Edit2, Users, BookOpen, Award, Save, X, Image as ImageIcon, Trash2, Camera, Upload, UserPlus, UserCheck, Clock } from "lucide-react";
+import { MapPin, Calendar, Edit2, Users, BookOpen, Award, Save, X, Image as ImageIcon, Trash2, Camera, Upload, UserPlus, UserCheck, Clock, Share2 } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "./ui/tabs";
 import { Button } from "./ui/button";
 import { PostCard } from "./PostCard";
@@ -290,6 +290,14 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
   }, [currentUserId, userId]);
   // ──────────────────────────────────────────────────────────────
 
+  // Share this profile's link
+  const handleShareProfile = () => {
+    const url = `${window.location.origin}?profile=${userId}`;
+    navigator.clipboard.writeText(url).then(() => {
+      toast.success("Profile link copied to clipboard! 🔗");
+    });
+  };
+
   const handleUpdateProfile = async () => {
     setLoading(true);
     try {
@@ -555,6 +563,16 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
                         Buddies ✓
                       </Button>
                     )}
+                    {/* Share Profile — always visible on other profiles */}
+                    <Button
+                      variant="outline"
+                      onClick={handleShareProfile}
+                      className="rounded-xl shadow-sm"
+                      style={{ borderColor: 'var(--theme-primary)', color: 'var(--theme-primary)' }}
+                    >
+                      <Share2 className="w-4 h-4 mr-2" />
+                      Share Profile
+                    </Button>
                   </div>
                 )}
 
@@ -575,6 +593,15 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
                     }} className="rounded-xl shadow-sm" style={{ borderColor: 'var(--theme-primary)', color: 'var(--theme-primary)' }}>
                       <Edit2 className="w-4 h-4 mr-2" />
                       Edit Profile
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={handleShareProfile}
+                      className="rounded-xl shadow-sm"
+                      style={{ borderColor: 'var(--theme-primary)', color: 'var(--theme-primary)' }}
+                    >
+                      <Share2 className="w-4 h-4 mr-2" />
+                      Share Profile
                     </Button>
                   </div>
                 )}
