@@ -67,11 +67,14 @@ export function TalkingBuddy() {
     getUserId();
   }, []);
 
-  // 2. LOGIC: WAITING (Realtime Match Listener)
+  // 2. LOGIC: WAITING (Realtime Match Listener + Polling Fallback)
   // If we are in the queue, we listen for when we get added to 'chat_participants'
   useEffect(() => {
     if (!userId || status !== 'waiting') return;
 
+    let isMatched = false;
+
+    // --- Realtime Listener ---
     matchChannelRef.current = supabase
       .channel(`participant_tracker:${userId}`)
       .on(
@@ -83,6 +86,8 @@ export function TalkingBuddy() {
           filter: `user_id=eq.${userId}`,
         },
         async (payload) => {
+          if (isMatched) return;
+          isMatched = true;
           // We have been paired!
           const newChatId = payload.new.chat_id;
           await handleMatchFound(newChatId);
@@ -90,7 +95,32 @@ export function TalkingBuddy() {
       )
       .subscribe();
 
+    // --- Polling Fallback (every 3 seconds) ---
+    // Catches cases where Realtime event is missed or Realtime is not enabled on chat_participants.
+    // We join with chats to only pick up fresh buddy-type chats, not old/regular chats.
+    const pollInterval = setInterval(async () => {
+      if (isMatched) return;
+      try {
+        const { data, error } = await supabase
+          .from("chat_participants")
+          .select("chat_id, chats!inner(id, type, status)")
+          .eq("user_id", userId)
+          .eq("chats.type", "buddy")
+          .eq("chats.status", "temporary")
+          .limit(1);
+
+        if (!error && data && data.length > 0) {
+          isMatched = true;
+          clearInterval(pollInterval);
+          await handleMatchFound(data[0].chat_id);
+        }
+      } catch (e) {
+        // silently ignore poll errors
+      }
+    }, 3000);
+
     return () => {
+      clearInterval(pollInterval);
       if (matchChannelRef.current) supabase.removeChannel(matchChannelRef.current);
     };
   }, [userId, status]);
