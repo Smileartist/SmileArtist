@@ -5,6 +5,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { supabase } from "../utils/supabaseClient";
+import { toast } from "sonner";
 
 interface ProfileData {
   full_name: string;
@@ -206,9 +207,59 @@ export function NotificationPage() {
     }
   };
 
-  const handleBuddyRequest = async (notificationId: string, accept: boolean) => {
-    markAsRead(notificationId);
-    console.log(`Buddy request ${accept ? 'accepted' : 'declined'} for notification ID: ${notificationId}`);
+  const handleBuddyRequest = async (notification: Notification, accept: boolean) => {
+    markAsRead(notification.id);
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    try {
+      // Find the pending buddy_request from the sender to the current user
+      const { data: buddyReq } = await supabase
+        .from('buddy_requests')
+        .select('id')
+        .eq('from_user', notification.sender_id)
+        .eq('to_user', user.id)
+        .eq('status', 'pending')
+        .maybeSingle();
+
+      if (!buddyReq) { toast.error('Buddy request not found or already handled.'); return; }
+
+      if (accept) {
+        // Mark accepted
+        await supabase.from('buddy_requests').update({ status: 'accepted' }).eq('id', buddyReq.id);
+
+        // Create a permanent buddy chat
+        const { data: chat, error: chatError } = await supabase
+          .from('chats')
+          .insert({ type: 'buddy', status: 'permanent', last_message_at: new Date().toISOString() })
+          .select()
+          .single();
+        if (chatError) throw chatError;
+
+        await supabase.from('chat_participants').insert([
+          { chat_id: chat.id, user_id: user.id },
+          { chat_id: chat.id, user_id: notification.sender_id },
+        ]);
+
+        // Notify the original sender
+        await supabase.from('notifications').insert({
+          recipient_id: notification.sender_id,
+          sender_id: user.id,
+          type: 'buddy_accepted',
+          content: 'accepted your buddy request',
+          is_read: false,
+        });
+
+        toast.success('Buddy request accepted! You can now chat 💬');
+      } else {
+        await supabase.from('buddy_requests').update({ status: 'rejected' }).eq('id', buddyReq.id);
+        toast.success('Buddy request declined.');
+      }
+    } catch (err: any) {
+      console.error('Error handling buddy request:', err);
+      toast.error(err.message || 'Something went wrong');
+    }
   };
 
   const filterNotifications = (filter: string) => {
@@ -283,7 +334,7 @@ export function NotificationPage() {
                   size="sm"
                   onClick={(e: React.MouseEvent) => {
                     e.stopPropagation();
-                    handleBuddyRequest(notification.id, true);
+                    handleBuddyRequest(notification, true);
                   }}
                   className="rounded-lg text-white"
                   style={{
@@ -297,7 +348,7 @@ export function NotificationPage() {
                   variant="outline"
                   onClick={(e: React.MouseEvent) => {
                     e.stopPropagation();
-                    handleBuddyRequest(notification.id, false);
+                    handleBuddyRequest(notification, false);
                   }}
                   className="rounded-lg"
                   style={{

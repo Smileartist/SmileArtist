@@ -68,8 +68,20 @@ export function Login({ onLogin }: LoginProps) {
             },
           ]);
           if (profileError) console.error("Error creating profile:", profileError);
+
+          // Also insert into users table (required for FK constraints:
+          // comments, saved_posts, collections, reading_history, notifications, buddies)
+          const { error: userError } = await supabase.from("users").insert([
+            {
+              id: user.id,
+              username: username.toLowerCase(),
+              name: username,
+              full_name: username,
+            },
+          ]);
+          if (userError) console.error("Error creating users record:", userError);
         }
-        onLogin(user.user_metadata?.username || username, user.id);
+        onLogin(username, user.id);
       } else {
         setError("An unexpected error occurred.");
       }

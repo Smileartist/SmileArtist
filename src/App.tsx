@@ -21,8 +21,17 @@ import { supabase } from "./utils/supabaseClient";
 
 export const UserDataContext = createContext<{
   avatarUrl: string | null;
+  username: string;
+  userId: string;
   refreshAvatar: () => Promise<void>;
-}>({ avatarUrl: null, refreshAvatar: async () => {} });
+  refreshUserData: () => Promise<void>;
+}>({
+  avatarUrl: null,
+  username: "",
+  userId: "",
+  refreshAvatar: async () => {},
+  refreshUserData: async () => {},
+});
 
 export const useUserData = () => useContext(UserDataContext);
 
@@ -83,10 +92,13 @@ function AppContent() {
     }
   }, []);
 
-  const handleLogin = (username: string, userId: string) => {
-    setUsername(username);
-    setUserId(userId);
+  const handleLogin = (usernameFromForm: string, userIdParam: string) => {
+    // Set initial values from the form immediately so the UI isn't blank
+    setUsername(usernameFromForm);
+    setUserId(userIdParam);
     setIsLoggedIn(true);
+    // Then fetch the authoritative username from the DB (handles existing users too)
+    fetchProfileData(userIdParam);
   };
 
   const handleLogout = async () => {
@@ -155,8 +167,12 @@ function AppContent() {
     if (userId) await fetchProfileData(userId);
   };
 
+  const refreshUserData = async () => {
+    if (userId) await fetchProfileData(userId);
+  };
+
   return (
-    <UserDataContext.Provider value={{ avatarUrl, refreshAvatar }}>
+    <UserDataContext.Provider value={{ avatarUrl, username, userId, refreshAvatar, refreshUserData }}>
       <div 
         className="min-h-screen transition-colors duration-300"
         style={{

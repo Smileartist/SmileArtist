@@ -5,6 +5,7 @@ import { Input } from "./ui/input";
 import { useTheme } from "../utils/ThemeContext";
 import { supabase } from "../utils/supabaseClient";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
+import { useUserData } from "../App";
 import {
   User,
   Lock,
@@ -32,8 +33,12 @@ interface SettingsProps {
   onUsernameUpdate: (newUsername: string) => void;
 }
 
-export function Settings({ onLogout, username, userId, onUsernameUpdate }: SettingsProps) {
+export function Settings({ onLogout, username: usernameProp, userId, onUsernameUpdate }: SettingsProps) {
   const { theme, updateTheme, resetTheme } = useTheme();
+  // Use context username as the authoritative source; fall back to prop during initial render
+  const { username: contextUsername, refreshUserData } = useUserData();
+  const username = contextUsername || usernameProp;
+
   const [activeSection, setActiveSection] = useState<string | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [editableUsername, setEditableUsername] = useState(username);
@@ -82,6 +87,8 @@ export function Settings({ onLogout, username, userId, onUsernameUpdate }: Setti
         } else {
           alert("Username updated successfully!");
           setIsEditingUsername(false);
+          // Refresh the entire app's user data so username updates everywhere instantly
+          await refreshUserData();
           onUsernameUpdate(editableUsername);
         }
     } catch (error: any) {

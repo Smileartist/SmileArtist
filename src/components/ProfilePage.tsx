@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useUserData } from "../App";
-import { MapPin, Calendar, Edit2, Users, BookOpen, Award, Save, X, Image as ImageIcon, Trash2, Camera, Upload } from "lucide-react";
+import { MapPin, Calendar, Edit2, Users, BookOpen, Award, Save, X, Image as ImageIcon, Trash2, Camera, Upload, UserPlus, UserCheck, Clock } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "./ui/tabs";
 import { Button } from "./ui/button";
 import { PostCard } from "./PostCard";
@@ -19,6 +19,7 @@ interface ProfilePageProps {
 
 export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
   const { refreshAvatar } = useUserData();
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [userPosts, setUserPosts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [profileData, setProfileData] = useState<any>(null);
@@ -102,9 +103,128 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
     }
   };
 
+  // Determine if this profile belongs to the logged-in user
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setCurrentUserId(user?.id ?? null);
+    });
+  }, []);
+
   useEffect(() => {
     fetchProfileData();
   }, [userId]);
+
+  const isOwnProfile = currentUserId === userId;
+
+  // ── Buddy system ──────────────────────────────────────────────
+  const [buddyStatus, setBuddyStatus] = useState<null | 'pending_sent' | 'pending_received' | 'accepted'>(null);
+  const [buddyRequestId, setBuddyRequestId] = useState<string | null>(null);
+  const [buddyLoading, setBuddyLoading] = useState(false);
+
+  const checkBuddyStatus = async () => {
+    if (!currentUserId || !userId || currentUserId === userId) return;
+    const { data } = await supabase
+      .from('buddy_requests')
+      .select('id, status, from_user, to_user')
+      .or(`and(from_user.eq.${currentUserId},to_user.eq.${userId}),and(from_user.eq.${userId},to_user.eq.${currentUserId})`)
+      .maybeSingle();
+
+    if (!data) { setBuddyStatus(null); setBuddyRequestId(null); return; }
+    setBuddyRequestId(data.id);
+    if (data.status === 'accepted') setBuddyStatus('accepted');
+    else if (data.from_user === currentUserId) setBuddyStatus('pending_sent');
+    else setBuddyStatus('pending_received');
+  };
+
+  // Ensure user row exists (FK requirement for notifications)
+  const ensureUserExists = async (uid: string) => {
+    const { data } = await supabase.from("users").select("id").eq("id", uid).maybeSingle();
+    if (!data) {
+      const { data: profile } = await supabase.from("profiles").select("username, full_name").eq("id", uid).maybeSingle();
+      await supabase.from("users").insert({
+        id: uid,
+        username: profile?.username || "user",
+        name: profile?.full_name || profile?.username || "user",
+        full_name: profile?.full_name || profile?.username || "user",
+      });
+    }
+  };
+
+  const sendBuddyRequest = async () => {
+    if (!currentUserId) return;
+    setBuddyLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('buddy_requests')
+        .insert({ from_user: currentUserId, to_user: userId, status: 'pending' })
+        .select()
+        .single();
+      if (error) throw error;
+      setBuddyStatus('pending_sent');
+      setBuddyRequestId(data.id);
+
+      // Notify receiver
+      await ensureUserExists(currentUserId);
+      await ensureUserExists(userId);
+      await supabase.from('notifications').insert({
+        recipient_id: userId,
+        sender_id: currentUserId,
+        type: 'buddy_request',
+        content: 'sent you a buddy request',
+        is_read: false,
+      });
+      toast.success('Buddy request sent!');
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to send buddy request');
+    } finally {
+      setBuddyLoading(false);
+    }
+  };
+
+  const acceptBuddyRequest = async () => {
+    if (!buddyRequestId || !currentUserId) return;
+    setBuddyLoading(true);
+    try {
+      await supabase.from('buddy_requests').update({ status: 'accepted' }).eq('id', buddyRequestId);
+
+      // Create a permanent buddy chat
+      const { data: chat, error: chatError } = await supabase
+        .from('chats')
+        .insert({ type: 'buddy', status: 'permanent', last_message_at: new Date().toISOString() })
+        .select()
+        .single();
+      if (chatError) throw chatError;
+
+      await supabase.from('chat_participants').insert([
+        { chat_id: chat.id, user_id: currentUserId },
+        { chat_id: chat.id, user_id: userId },
+      ]);
+
+      // Notify the sender
+      await ensureUserExists(currentUserId);
+      await supabase.from('notifications').insert({
+        recipient_id: userId,
+        sender_id: currentUserId,
+        type: 'buddy_accepted',
+        content: 'accepted your buddy request',
+        is_read: false,
+      });
+
+      setBuddyStatus('accepted');
+      toast.success('You are now buddies! Start chatting 💬');
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to accept request');
+    } finally {
+      setBuddyLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (currentUserId && userId && currentUserId !== userId) {
+      checkBuddyStatus();
+    }
+  }, [currentUserId, userId]);
+  // ──────────────────────────────────────────────────────────────
 
   const handleUpdateProfile = async () => {
     setLoading(true);
@@ -236,7 +356,7 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
           backgroundPosition: 'center',
         }}
       >
-        {isEditing && (
+        {isEditing && isOwnProfile && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity gap-3">
             <div className="flex gap-4">
               <label 
@@ -269,7 +389,7 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
               </Avatar>
             </div>
 
-            {isEditing && (
+            {isEditing && isOwnProfile && (
               <div className="flex gap-2 w-full justify-center md:justify-start">
                 <Button 
                   asChild
@@ -320,23 +440,66 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
                   <h1 style={{ color: 'var(--theme-text)' }}>{profileUser.name}</h1>
                   <span className="opacity-60" style={{ color: 'var(--theme-text)' }}>{profileUser.username}</span>
                 </div>
-                <div className="flex gap-2 mb-4 justify-center md:justify-start">
-                  <Button variant="outline" onClick={() => {
-                    setEditFullName(profileData.full_name || "");
-                    setEditBio(profileData.bio || "");
-                    setEditLocation(profileData.location || "");
-                    setEditAvatarUrl(profileData.avatar_url || "");
-                    setEditCoverUrl(profileData.cover_url || "");
-                    setEditIsMotivator(profileData.is_motivator || false);
-                    setEditInterests(profileData.interests || []);
-                    setEditMotivatorTitle(profileData.motivator_title || "");
-                    setEditMotivatorBio(profileData.motivator_bio || "");
-                    setIsEditing(true);
-                  }} className="rounded-xl shadow-sm" style={{ borderColor: 'var(--theme-primary)', color: 'var(--theme-primary)' }}>
-                    <Edit2 className="w-4 h-4 mr-2" />
-                    Edit Profile
-                  </Button>
-                </div>
+                {/* Buddy button — only on other people's profiles */}
+                {!isOwnProfile && currentUserId && (
+                  <div className="flex gap-2 mb-4 justify-center md:justify-start">
+                    {buddyStatus === null && (
+                      <Button
+                        onClick={sendBuddyRequest}
+                        disabled={buddyLoading}
+                        className="rounded-xl text-white shadow-md"
+                        style={{ background: 'linear-gradient(to right, var(--theme-primary), var(--theme-secondary))' }}
+                      >
+                        <UserPlus className="w-4 h-4 mr-2" />
+                        {buddyLoading ? 'Sending…' : 'Add Buddy'}
+                      </Button>
+                    )}
+                    {buddyStatus === 'pending_sent' && (
+                      <Button variant="outline" disabled className="rounded-xl" style={{ borderColor: 'var(--theme-primary)', color: 'var(--theme-primary)' }}>
+                        <Clock className="w-4 h-4 mr-2" />
+                        Request Sent
+                      </Button>
+                    )}
+                    {buddyStatus === 'pending_received' && (
+                      <Button
+                        onClick={acceptBuddyRequest}
+                        disabled={buddyLoading}
+                        className="rounded-xl text-white shadow-md"
+                        style={{ background: 'linear-gradient(to right, var(--theme-primary), var(--theme-secondary))' }}
+                      >
+                        <UserCheck className="w-4 h-4 mr-2" />
+                        {buddyLoading ? 'Accepting…' : 'Accept Request'}
+                      </Button>
+                    )}
+                    {buddyStatus === 'accepted' && (
+                      <Button variant="outline" disabled className="rounded-xl" style={{ borderColor: 'var(--theme-primary)', color: 'var(--theme-primary)' }}>
+                        <UserCheck className="w-4 h-4 mr-2" />
+                        Buddies ✓
+                      </Button>
+                    )}
+                  </div>
+                )}
+
+                {/* Only show Edit Profile button on your own profile */}
+                {isOwnProfile && (
+                  <div className="flex gap-2 mb-4 justify-center md:justify-start">
+                    <Button variant="outline" onClick={() => {
+                      setEditFullName(profileData.full_name || "");
+                      setEditBio(profileData.bio || "");
+                      setEditLocation(profileData.location || "");
+                      setEditAvatarUrl(profileData.avatar_url || "");
+                      setEditCoverUrl(profileData.cover_url || "");
+                      setEditIsMotivator(profileData.is_motivator || false);
+                      setEditInterests(profileData.interests || []);
+                      setEditMotivatorTitle(profileData.motivator_title || "");
+                      setEditMotivatorBio(profileData.motivator_bio || "");
+                      setIsEditing(true);
+                    }} className="rounded-xl shadow-sm" style={{ borderColor: 'var(--theme-primary)', color: 'var(--theme-primary)' }}>
+                      <Edit2 className="w-4 h-4 mr-2" />
+                      Edit Profile
+                    </Button>
+                  </div>
+                )}
                 <p className="mb-4 max-w-2xl" style={{ color: 'var(--theme-text)', opacity: 0.8 }}>{profileUser.bio}</p>
                 <div className="flex flex-wrap gap-4 text-sm mb-4 justify-center md:justify-start">
                   <div className="flex items-center gap-1" style={{ color: 'var(--theme-text)', opacity: 0.7 }}><MapPin className="w-4 h-4" />{profileUser.location}</div>

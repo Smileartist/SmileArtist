@@ -18,7 +18,6 @@ export function MobileHeader({ onMenuClick, onViewChange, activeView }: MobileHe
       style={{
         backgroundColor: 'var(--theme-background)',
         borderColor: 'var(--theme-primary)' + '33',
-        opacity: 0.95
       }}
     >
       <div className="grid grid-cols-3 items-center px-4 py-3">
@@ -45,7 +44,7 @@ export function MobileHeader({ onMenuClick, onViewChange, activeView }: MobileHe
           <img 
             src={logo} 
             alt="Smile Artist" 
-            className="h-8 object-contain dark:invert"
+            className="h-8 object-contain"
           />
         </div>
         <div className="flex items-center gap-2 justify-self-end">

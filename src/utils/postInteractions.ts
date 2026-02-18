@@ -54,17 +54,37 @@ export async function handleLike(postId: string, currentLikes: number, userId: s
 
 export async function handleSave(postId: string, userId: string): Promise<boolean> {
   try {
+    // Ensure the user exists in the `users` table (FK constraint for saved_posts).
+    const { data: existingUser } = await supabase
+      .from("users")
+      .select("id")
+      .eq("id", userId)
+      .maybeSingle();
+
+    if (!existingUser) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("username, full_name")
+        .eq("id", userId)
+        .maybeSingle();
+
+      await supabase.from("users").insert({
+        id: userId,
+        username: profile?.username || "user",
+        name: profile?.full_name || profile?.username || "user",
+        full_name: profile?.full_name || profile?.username || "user",
+      });
+    }
+
     // Check if the post is already saved by the user
     const { data: existingSave, error: checkError } = await supabase
       .from("saved_posts")
       .select("user_id")
       .eq("post_id", postId)
       .eq("user_id", userId)
-      .single();
+      .maybeSingle();
 
-    if (checkError && checkError.code !== 'PGRST116') { // PGRST116 means no rows found
-      throw checkError;
-    }
+    if (checkError) throw checkError;
 
     let isSaved = false;
 
@@ -101,12 +121,32 @@ export async function handleComment(postId: string, userId: string, commentConte
       return;
     }
 
-    // Generate a UUID for the comment (assuming it needs one for PRIMARY KEY)
-    // Supabase can also handle this if the table has a default gen_random_uuid()
+    // Ensure the user exists in the `users` table (FK constraint for comments).
+    // This covers users who signed up before the dual-table insert was added.
+    const { data: existingUser } = await supabase
+      .from("users")
+      .select("id")
+      .eq("id", userId)
+      .maybeSingle();
+
+    if (!existingUser) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("username, full_name")
+        .eq("id", userId)
+        .maybeSingle();
+
+      await supabase.from("users").insert({
+        id: userId,
+        username: profile?.username || "user",
+        name: profile?.full_name || profile?.username || "user",
+        full_name: profile?.full_name || profile?.username || "user",
+      });
+    }
+
     const { error: insertError } = await supabase
       .from("comments")
       .insert([{ 
-        id: crypto.randomUUID(), 
         post_id: postId, 
         user_id: userId, 
         content: commentContent,
