@@ -193,15 +193,23 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
       .or(`from_user.eq.${userId},to_user.eq.${userId}`);
 
     if (error || !data) return;
-    setBuddyCount(data.length);
+
+    // Use a Set to deduplicate buddy IDs
+    const uniqueBuddyIds = new Set<string>();
+    data.forEach((req: any) => {
+      const otherId = req.from_user === userId ? req.to_user : req.from_user;
+      if (otherId) uniqueBuddyIds.add(otherId);
+    });
+
+    // Set buddy count to the number of unique buddies
+    setBuddyCount(uniqueBuddyIds.size);
 
     const profiles = await Promise.all(
-      data.map(async (req: any) => {
-        const otherId = req.from_user === userId ? req.to_user : req.from_user;
+      Array.from(uniqueBuddyIds).map(async (buddyId) => {
         const { data: profile } = await supabase
           .from('profiles')
           .select('id, full_name, username, avatar_url')
-          .eq('id', otherId)
+          .eq('id', buddyId)
           .maybeSingle();
         return profile;
       })

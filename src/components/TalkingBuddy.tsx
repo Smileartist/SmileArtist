@@ -58,6 +58,9 @@ export function TalkingBuddy() {
   // Queue broadcasts sent before the channel is SUBSCRIBED — flushed on SUBSCRIBED
   const pendingBroadcastsRef = useRef<Array<{ type: string; event: string; payload: any }>>([]);
   const channelReadyRef = useRef(false);       // ref mirror of channelReady (no stale-closure)
+  // Synchronous dedup set — prevents React-18 batching from adding the same message twice
+  // when Broadcast + postgres_changes + polling all fire within the same tick.
+  const receivedMsgIdsRef = useRef<Set<string>>(new Set());
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -106,22 +109,38 @@ export function TalkingBuddy() {
 
     // --- Polling Fallback (every 3 seconds) ---
     // Catches cases where Realtime event is missed or Realtime is not enabled on chat_participants.
-    // We join with chats to only pick up fresh buddy-type chats, not old/regular chats.
+    // IMPORTANT: Only look at chats created VERY recently (last 5 min) so we never accidentally
+    // pick up a stale temporary chat from a previous test session and land on the wrong sessionId.
     const pollInterval = setInterval(async () => {
       if (isMatched) return;
       try {
+        // Fetch ALL temp buddy chats for this user (includes created_at for client-side freshness check)
         const { data, error } = await supabase
           .from("chat_participants")
-          .select("chat_id, chats!inner(id, type, status)")
+          .select("chat_id, chats!inner(id, type, status, created_at)")
           .eq("user_id", userId)
           .eq("chats.type", "buddy")
-          .eq("chats.status", "temporary")
-          .limit(1);
+          .eq("chats.status", "temporary");
 
         if (!error && data && data.length > 0) {
-          isMatched = true;
-          clearInterval(pollInterval);
-          await handleMatchFound(data[0].chat_id);
+          const fiveMinAgo = Date.now() - 5 * 60 * 1000;
+
+          // Client-side: keep only FRESH chats (created in last 5 min) and sort newest first.
+          // This prevents stale chats from previous test sessions from being picked up.
+          const freshChats = data
+            .filter((d) => {
+              const chatCreatedAt = new Date((d.chats as any).created_at).getTime();
+              return chatCreatedAt > fiveMinAgo;
+            })
+            .sort((a, b) => {
+              return new Date((b.chats as any).created_at).getTime() - new Date((a.chats as any).created_at).getTime();
+            });
+
+          if (freshChats.length > 0) {
+            isMatched = true;
+            clearInterval(pollInterval);
+            await handleMatchFound(freshChats[0].chat_id);
+          }
         }
       } catch (e) {
         // silently ignore poll errors
@@ -142,23 +161,22 @@ export function TalkingBuddy() {
     if (!userId || status !== "connected" || !sessionId) return;
 
     setChannelReady(false);
+    // Reset dedup set for this new session
+    receivedMsgIdsRef.current.clear();
 
-    // Helper: merge incoming DB rows into local state (deduplicates by id)
+    // Helper: merge incoming DB rows into local state.
+    // Uses receivedMsgIdsRef for synchronous dedup — safe against React-18 batching.
     const mergeDbMessages = (dbRows: Array<{ id: string; sender_id: string; content: string; created_at: string }>) => {
-      setMessages((prev) => {
-        const existingIds = new Set(
-          prev.filter((m) => !m.id.startsWith("temp_") && !m.id.startsWith("welcome_") && !m.id.startsWith("sys_") && !m.id.startsWith("msg_")).map((m) => m.id)
-        );
-        const newOnes: Message[] = [];
-        for (const m of dbRows) {
-          if (existingIds.has(m.id)) continue;
-          if (m.sender_id === userId) continue; // own messages shown optimistically
-          newOnes.push({ id: m.id, text: m.content, sender: "other", senderId: m.sender_id, timestamp: new Date(m.created_at).getTime() });
-        }
-        if (newOnes.length === 0) return prev;
-        setOtherUserId((prevId) => prevId ?? newOnes[0].senderId);
-        return [...prev, ...newOnes].sort((a, b) => a.timestamp - b.timestamp);
-      });
+      const newOnes: Message[] = [];
+      for (const m of dbRows) {
+        if (m.sender_id === userId) continue; // own messages shown optimistically
+        if (receivedMsgIdsRef.current.has(m.id)) continue; // already delivered via Broadcast or pg_changes
+        receivedMsgIdsRef.current.add(m.id); // mark synchronously before state update
+        newOnes.push({ id: m.id, text: m.content, sender: "other", senderId: m.sender_id, timestamp: new Date(m.created_at).getTime() });
+      }
+      if (newOnes.length === 0) return;
+      setOtherUserId((prevId) => prevId ?? newOnes[0].senderId);
+      setMessages((prev) => [...prev, ...newOnes].sort((a, b) => a.timestamp - b.timestamp));
     };
 
     // ── Channel A: BROADCAST-ONLY ──────────────────────────────────────────────
@@ -171,11 +189,11 @@ export function TalkingBuddy() {
       .on("broadcast", { event: "new_message" }, (payload) => {
         const msg = payload.payload as { id: string; text: string; senderId: string; timestamp: number };
         if (msg.senderId === userId) return;
+        // Synchronous ref-based dedup: first delivery path wins, others skip
+        if (receivedMsgIdsRef.current.has(msg.id)) return;
+        receivedMsgIdsRef.current.add(msg.id);
         setOtherUserId((prev) => prev ?? msg.senderId);
-        setMessages((prev) => {
-          if (prev.some((m) => m.id === msg.id)) return prev;
-          return [...prev, { id: msg.id, text: msg.text, sender: "other", senderId: msg.senderId, timestamp: msg.timestamp }];
-        });
+        setMessages((prev) => [...prev, { id: msg.id, text: msg.text, sender: "other", senderId: msg.senderId, timestamp: msg.timestamp }]);
       })
       // 2. Incoming buddy/save request
       .on("broadcast", { event: "buddy_request" }, (payload) => {
@@ -221,11 +239,11 @@ export function TalkingBuddy() {
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages", filter: `chat_id=eq.${sessionId}` }, (payload) => {
         const m = payload.new as { id: string; chat_id: string; sender_id: string; content: string; is_read: boolean; created_at: string };
         if (m.sender_id === userId) return;
+        // Synchronous ref-based dedup: first delivery path wins, others skip
+        if (receivedMsgIdsRef.current.has(m.id)) return;
+        receivedMsgIdsRef.current.add(m.id);
         setOtherUserId((prev) => prev ?? m.sender_id);
-        setMessages((prev) => {
-          if (prev.some((msg) => msg.id === m.id)) return prev;
-          return [...prev, { id: m.id, text: m.content, sender: "other", senderId: m.sender_id, timestamp: new Date(m.created_at).getTime() }];
-        });
+        setMessages((prev) => [...prev, { id: m.id, text: m.content, sender: "other", senderId: m.sender_id, timestamp: new Date(m.created_at).getTime() }]);
       })
       .subscribe((chStatus, err) => {
         console.log("[TalkingBuddy] postgres_changes channel:", chStatus, err ?? "");
@@ -271,6 +289,7 @@ export function TalkingBuddy() {
   // startConnection() where React state (role) hasn't updated yet.
   const handleMatchFound = async (chatId: string, resolvedRole?: UserRole) => {
       const effectiveRole = resolvedRole ?? role;
+      console.log(`[TalkingBuddy] handleMatchFound — chatId: ${chatId}, role: ${effectiveRole}`);
 
       // Connect right away so the user isn't stuck on the waiting screen
       setSessionId(chatId);
@@ -356,7 +375,9 @@ export function TalkingBuddy() {
     const textToSend = inputMessage;
     setInputMessage("");
 
-    const msgId = `msg_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    // Use a proper UUID so Broadcast payload and postgres_changes INSERT both
+    // carry the SAME id → deduplication works and the message appears only once.
+    const msgId = crypto.randomUUID();
     const timestamp = Date.now();
 
     // Optimistic UI (show on sender's screen immediately)
@@ -377,17 +398,14 @@ export function TalkingBuddy() {
       pendingBroadcastsRef.current.push(broadcastMsg);
     }
 
-    // Persist to DB via SECURITY DEFINER RPC (bypasses RLS).
-    // Falls back to direct insert if RPC not deployed yet.
+    // Always use direct insert with the client-generated msgId UUID.
+    // This is critical: the RPC (send_buddy_message) generates its OWN server-side UUID,
+    // which would differ from our Broadcast msgId — breaking dedup and causing duplicates.
+    // Direct insert passes OUR msgId so DB UUID === Broadcast UUID === dedup key.
     try {
-      await sendBuddyMessageRpc(sessionId, userId, textToSend);
-    } catch (rpcErr) {
-      console.warn("RPC persist failed, trying direct insert:", rpcErr);
-      try {
-        await sendBuddyMessage(sessionId, userId, textToSend);
-      } catch (directErr) {
-        console.error("DB persist failed completely:", directErr);
-      }
+      await sendBuddyMessage(sessionId, userId, textToSend, msgId);
+    } catch (directErr) {
+      console.error("DB persist failed:", directErr);
     }
   };
 

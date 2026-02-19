@@ -236,6 +236,7 @@ export function PostCard({ post }: PostCardProps) {
         postContent={content}
         isOpen={showShareModal}
         onClose={() => setShowShareModal(false)}
+        onViewChange={onViewChange}
       />
     </Card>
   );

@@ -249,8 +249,9 @@ export const findBuddyMatch = async (userId: string, role: "listener" | "seeker"
   return data; 
 };
 
-export const sendBuddyMessage = async (chatId: string, userId: string, content: string) => {
+export const sendBuddyMessage = async (chatId: string, userId: string, content: string, id?: string) => {
   const { error } = await supabase.from("messages").insert({
+    ...(id ? { id } : {}), // use caller-supplied UUID so Broadcast + postgres_changes share the same ID
     chat_id: chatId,
     sender_id: userId,
     content,
