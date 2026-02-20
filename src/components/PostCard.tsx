@@ -58,6 +58,24 @@ export function PostCard({ post }: PostCardProps) {
     };
 
     checkState();
+
+    // Real-time subscription for likes count
+    const subscription = supabase
+      .channel(`post_likes_channel:${postId}`)
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "posts", filter: `id=eq.${postId}` },
+        (payload) => {
+          if (payload.new.likes !== undefined) {
+            setLikeCount(payload.new.likes);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(subscription);
+    };
   }, [postId]);
 
   const handleLike = async () => {

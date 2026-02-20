@@ -172,7 +172,24 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
 
   useEffect(() => {
     fetchProfileData();
-  }, [userId]);
+
+    // Realtime subscription for follow count
+    const subscription = supabase
+      .channel(`profile_followers:${userId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "follows", filter: `following_id=eq.${userId}` },
+        () => {
+          // Re-fetch follower data when a change occurs in the follows table for this profile
+          fetchFollowData(currentUserId);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(subscription);
+    };
+  }, [userId, currentUserId]);
 
   const isOwnProfile = currentUserId === userId;
 
@@ -319,13 +336,6 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
     }
   };
 
-  useEffect(() => {
-    if (currentUserId && userId && currentUserId !== userId) {
-      checkBuddyStatus();
-    }
-    fetchFollowData(currentUserId);
-    fetchBuddies();
-  }, [currentUserId, userId]);
   // ──────────────────────────────────────────────────────────────
 
   // Share this profile's link
@@ -445,7 +455,7 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
       following: 0,
     },
     interests: profileData?.interests || [],
-  }), [profileData, userPosts]); // Depend on profileData and userPosts
+  }), [profileData, userPosts, followerCount]); // Depend on profileData, userPosts, and followerCount
 
   if (loading && !profileData) {
     return (
@@ -724,7 +734,7 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
                         }
                         setNewInterest('');
                       }
-                    }} 
+                    }}
                     className="bg-[var(--theme-card-bg)] rounded-xl border-[var(--theme-primary)]/20" 
                     placeholder="Type and press Enter to add tags..." 
                   />
