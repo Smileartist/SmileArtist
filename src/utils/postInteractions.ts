@@ -1,6 +1,10 @@
 import { supabase } from "./supabaseClient";
 
-export async function handleLike(postId: string, currentLikes: number, userId: string): Promise<{ newLikes: number, isLiked: boolean }> {
+export async function handleLike(
+  postId: string,
+  currentLikes: number,
+  userId: string
+): Promise<{ newLikes: number; isLiked: boolean }> {
   try {
     // First, check if the user has already liked the post
     const { data: existingLike, error: checkError } = await supabase
@@ -24,26 +28,30 @@ export async function handleLike(postId: string, currentLikes: number, userId: s
         .eq("user_id", userId);
 
       if (deleteError) throw deleteError;
+
       newLikes = Math.max(0, currentLikes - 1);
       isLiked = false;
     } else {
       // User has not liked, so like the post
       const { error: insertError } = await supabase
         .from("post_likes")
-        .insert([{ post_id: postId, user_id: userId, created_at: new Date().toISOString() }]);
+        .insert([
+          {
+            post_id: postId,
+            user_id: userId,
+            created_at: new Date().toISOString(),
+          },
+        ]);
 
       if (insertError) throw insertError;
+
       newLikes = currentLikes + 1;
       isLiked = true;
     }
 
-    // Update the likes count in the posts table
-    const { error: updateError } = await supabase
-      .from("posts")
-      .update({ likes: newLikes })
-      .eq("id", postId);
-
-    if (updateError) throw updateError;
+    // ✅ FIX:
+    // Removed manual update of posts.likes column.
+    // That logic was causing race conditions and frontend/backend mismatch.
 
     return { newLikes, isLiked };
   } catch (error) {
@@ -52,7 +60,10 @@ export async function handleLike(postId: string, currentLikes: number, userId: s
   }
 }
 
-export async function handleSave(postId: string, userId: string): Promise<boolean> {
+export async function handleSave(
+  postId: string,
+  userId: string
+): Promise<boolean> {
   try {
     // Ensure the user exists in the `users` table (FK constraint for saved_posts).
     const { data: existingUser } = await supabase
@@ -97,16 +108,25 @@ export async function handleSave(postId: string, userId: string): Promise<boolea
         .eq("post_id", postId);
 
       if (deleteError) throw deleteError;
+
       isSaved = false;
     } else {
       // Post is not saved, so save it
       const { error: insertError } = await supabase
         .from("saved_posts")
-        .insert([{ post_id: postId, user_id: userId, saved_at: new Date().toISOString() }]);
+        .insert([
+          {
+            post_id: postId,
+            user_id: userId,
+            saved_at: new Date().toISOString(),
+          },
+        ]);
 
       if (insertError) throw insertError;
+
       isSaved = true;
     }
+
     return isSaved;
   } catch (error) {
     console.error("Error handling save:", error);
@@ -114,7 +134,11 @@ export async function handleSave(postId: string, userId: string): Promise<boolea
   }
 }
 
-export async function handleComment(postId: string, userId: string, commentContent: string): Promise<void> {
+export async function handleComment(
+  postId: string,
+  userId: string,
+  commentContent: string
+): Promise<void> {
   try {
     if (!commentContent.trim()) {
       console.warn("Comment content cannot be empty.");
@@ -122,7 +146,6 @@ export async function handleComment(postId: string, userId: string, commentConte
     }
 
     // Ensure the user exists in the `users` table (FK constraint for comments).
-    // This covers users who signed up before the dual-table insert was added.
     const { data: existingUser } = await supabase
       .from("users")
       .select("id")
@@ -146,24 +169,30 @@ export async function handleComment(postId: string, userId: string, commentConte
 
     const { error: insertError } = await supabase
       .from("comments")
-      .insert([{ 
-        post_id: postId, 
-        user_id: userId, 
-        content: commentContent,
-        created_at: new Date().toISOString()
-      }]);
+      .insert([
+        {
+          post_id: postId,
+          user_id: userId,
+          content: commentContent,
+          created_at: new Date().toISOString(),
+        },
+      ]);
 
     if (insertError) throw insertError;
 
-    // Update the comments count in the posts table - fetching current and incrementing 
-    // (Alternative to RPC if RPC doesn't exist yet)
-    const { data: postData } = await supabase.from('posts').select('comments').eq('id', postId).single();
+    // Update the comments count in the posts table
+    const { data: postData } = await supabase
+      .from("posts")
+      .select("comments")
+      .eq("id", postId)
+      .single();
+
     const newCommentsCount = (postData?.comments || 0) + 1;
 
     const { error: updateError } = await supabase
-      .from('posts')
+      .from("posts")
       .update({ comments: newCommentsCount })
-      .eq('id', postId);
+      .eq("id", postId);
 
     if (updateError) throw updateError;
 

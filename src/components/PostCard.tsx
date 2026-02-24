@@ -25,18 +25,30 @@ export function PostCard({ post }: PostCardProps) {
   const { onViewChange, userId: currentUserId } = useUserData();
   const { postId, author, content, title, likes, comments: initialComments, created_at: timestamp, category } = post;
 
-  const [likeCount, setLikeCount] = useState(likes);
-  const [liked, setLiked] = useState(false);
+  // 🔥 FIX: do NOT trust posts.likes anymore
+  const [likeCount, setLikeCount] = useState(0);
+  const [liked, setLiked] = useState<boolean | null>(null);
   const [saved, setSaved] = useState(false);
   const [showCommentModal, setShowCommentModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [commentCount, setCommentCount] = useState(initialComments);
 
-  // Check existing like/save on mount
   useEffect(() => {
     const checkState = async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+
+      // ✅ Always fetch real like count from post_likes
+      const { count } = await supabase
+        .from("post_likes")
+        .select("*", { count: "exact", head: true })
+        .eq("post_id", postId);
+
+      setLikeCount(count || 0);
+
+      if (!user) {
+        setLiked(false);
+        return;
+      }
 
       const { data: likeRow } = await supabase
         .from("post_likes")
@@ -45,7 +57,7 @@ export function PostCard({ post }: PostCardProps) {
         .eq("user_id", user.id)
         .maybeSingle();
 
-      if (likeRow) setLiked(true);
+      setLiked(!!likeRow);
 
       const { data: saveRow } = await supabase
         .from("saved_posts")
@@ -59,39 +71,33 @@ export function PostCard({ post }: PostCardProps) {
 
     checkState();
 
-    // Real-time subscription for likes count
-    const subscription = supabase
-      .channel(`post_likes_channel:${postId}`)
-      .on(
-        "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "posts", filter: `id=eq.${postId}` },
-        (payload) => {
-          if (payload.new.likes !== undefined) {
-            setLikeCount(payload.new.likes);
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(subscription);
-    };
   }, [postId]);
 
   const handleLike = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return alert("Login required");
 
-    const prevLiked = liked;
+    const prevLiked = liked || false;
     const prevLikeCount = likeCount;
 
+    // Optimistic UI (kept same logic)
     setLiked(!prevLiked);
     setLikeCount(prevLiked ? Math.max(0, prevLikeCount - 1) : prevLikeCount + 1);
 
     try {
       const { newLikes, isLiked } = await handleLikeUtil(postId, prevLikeCount, user.id);
-      setLikeCount(newLikes);
+
       setLiked(isLiked);
+      setLikeCount(newLikes);
+
+      // 🔥 Safety: re-fetch true count to avoid drift
+      const { count } = await supabase
+        .from("post_likes")
+        .select("*", { count: "exact", head: true })
+        .eq("post_id", postId);
+
+      setLikeCount(count || 0);
+
     } catch (error) {
       setLiked(prevLiked);
       setLikeCount(prevLikeCount);
@@ -119,14 +125,12 @@ export function PostCard({ post }: PostCardProps) {
     setCommentCount((prev: number) => prev + 1);
   };
 
-  // Navigate to author's profile
   const handleAuthorClick = () => {
     if (post.user_id) {
       onViewChange("profile", post.user_id);
     }
   };
 
-  // Copy a shareable link to clipboard
   const handleCopyLink = () => {
     const url = `${window.location.origin}?post=${postId}`;
     navigator.clipboard.writeText(url).then(() => {
@@ -134,7 +138,6 @@ export function PostCard({ post }: PostCardProps) {
     });
   };
 
-  // Share the author's profile link
   const handleShareProfile = () => {
     const url = `${window.location.origin}?profile=${post.user_id}`;
     navigator.clipboard.writeText(url).then(() => {
@@ -142,7 +145,6 @@ export function PostCard({ post }: PostCardProps) {
     });
   };
 
-  // Report the post
   const handleReport = () => {
     toast.success("Post reported. Thank you for keeping the community safe. 🙏");
   };
@@ -150,7 +152,6 @@ export function PostCard({ post }: PostCardProps) {
   return (
     <Card className="p-4 md:p-6">
       <div className="flex items-start justify-between mb-4">
-        {/* Clickable author area */}
         <button
           onClick={handleAuthorClick}
           className="flex items-center gap-3 text-left hover:opacity-75 transition-opacity"
@@ -169,7 +170,6 @@ export function PostCard({ post }: PostCardProps) {
           </div>
         </button>
 
-        {/* 3-dot dropdown */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
@@ -180,23 +180,20 @@ export function PostCard({ post }: PostCardProps) {
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-44">
-            <DropdownMenuItem onClick={handleAuthorClick} className="cursor-pointer">
+            <DropdownMenuItem onClick={handleAuthorClick}>
               <User className="w-4 h-4 mr-2" />
               View Profile
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={handleCopyLink} className="cursor-pointer">
+            <DropdownMenuItem onClick={handleCopyLink}>
               <Link2 className="w-4 h-4 mr-2" />
               Copy Link
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={handleShareProfile} className="cursor-pointer">
+            <DropdownMenuItem onClick={handleShareProfile}>
               <Share2 className="w-4 h-4 mr-2" />
               Share Profile
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={handleReport}
-              className="cursor-pointer text-red-500 focus:text-red-500"
-            >
+            <DropdownMenuItem onClick={handleReport} className="text-red-500">
               <Flag className="w-4 h-4 mr-2" />
               Report Post
             </DropdownMenuItem>
@@ -214,8 +211,8 @@ export function PostCard({ post }: PostCardProps) {
         <button onClick={handleLike} className="flex items-center gap-2">
           <Heart
             className="w-5 h-5"
-            fill={liked ? "var(--theme-primary)" : "none"}
-            color={liked ? "var(--theme-primary)" : "currentColor"}
+            fill={liked === true ? "var(--theme-primary)" : "none"}
+            color={liked === true ? "var(--theme-primary)" : "currentColor"}
           />
           <span>{likeCount}</span>
         </button>
