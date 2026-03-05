@@ -19,7 +19,7 @@ interface Notification {
   sender_id: string; // Only store sender_id, fetch profile separately
   sender_profile: ProfileData | null; // To store fetched profile data
   content?: string;
-  post_id?: string; 
+  post_id?: string;
   created_at: string;
   is_read: boolean;
 }
@@ -56,35 +56,34 @@ export function NotificationPage() {
             .order("created_at", { ascending: false });
 
           if (fetchError) throw fetchError;
-          
-          const notificationsWithProfilesPromises = (data || []).map(async (n: any) => {
-            let senderProfile: ProfileData | null = null;
-            if (n.sender_id) {
-              const { data: profileData, error: profileError } = await supabase
-                .from("profiles")
-                .select("full_name, username, avatar_url")
-                .eq("id", n.sender_id)
-                .single();
 
-              if (profileError) {
-                console.error("Error fetching sender profile for notification:", profileError);
-              } else {
-                senderProfile = profileData;
-              }
+          // Batch-fetch all sender profiles in one query instead of N+1
+          const senderIds = [...new Set((data || []).map((n: any) => n.sender_id).filter(Boolean))];
+
+          let profileMap: Record<string, ProfileData> = {};
+          if (senderIds.length > 0) {
+            const { data: profiles, error: profileError } = await supabase
+              .from("profiles")
+              .select("id, full_name, username, avatar_url")
+              .in("id", senderIds);
+
+            if (!profileError && profiles) {
+              profileMap = Object.fromEntries(
+                profiles.map((p: any) => [p.id, { full_name: p.full_name, username: p.username, avatar_url: p.avatar_url }])
+              );
             }
-            return {
-              id: n.id,
-              type: n.type,
-              sender_id: n.sender_id,
-              sender_profile: senderProfile,
-              content: n.content,
-              post_id: n.post_id,
-              created_at: n.created_at,
-              is_read: n.is_read,
-            };
-          });
+          }
 
-          const formattedNotifications = await Promise.all(notificationsWithProfilesPromises);
+          const formattedNotifications = (data || []).map((n: any) => ({
+            id: n.id,
+            type: n.type,
+            sender_id: n.sender_id,
+            sender_profile: n.sender_id ? (profileMap[n.sender_id] || null) : null,
+            content: n.content,
+            post_id: n.post_id,
+            created_at: n.created_at,
+            is_read: n.is_read,
+          }));
           setNotifications(formattedNotifications);
         } else {
           setNotifications([]);
@@ -117,7 +116,7 @@ export function NotificationPage() {
   };
 
   const markAsRead = async (id: string) => {
-    setNotifications(notifications.map(n => 
+    setNotifications(notifications.map(n =>
       n.id === id ? { ...n, is_read: true } : n
     ));
     try {
@@ -265,7 +264,7 @@ export function NotificationPage() {
   const filterNotifications = (filter: string) => {
     if (filter === "all") return notifications;
     if (filter === "mentions") return notifications.filter(n => n.type === "mention");
-    if (filter === "buddy") return notifications.filter(n => 
+    if (filter === "buddy") return notifications.filter(n =>
       n.type === "buddy_request" || n.type === "buddy_accepted"
     );
     return notifications;
@@ -273,14 +272,14 @@ export function NotificationPage() {
 
   const NotificationItem = ({ notification }: { notification: Notification }) => {
     const Icon = getNotificationIcon(notification.type);
-    
+
     return (
       <div
         onClick={() => markAsRead(notification.id)}
         className="flex gap-4 p-4 rounded-2xl transition-all cursor-pointer hover:shadow-md"
         style={{
           backgroundColor: notification.is_read ? 'transparent' : 'var(--theme-accent)',
-          border: `1px solid ${notification.is_read ? 'var(--theme-primary)22' : 'var(--theme-primary)44'}`, 
+          border: `1px solid ${notification.is_read ? 'var(--theme-primary)22' : 'var(--theme-primary)44'}`,
         }}
       >
         <Avatar className="w-12 h-12 flex-shrink-0">
@@ -290,7 +289,7 @@ export function NotificationPage() {
 
         <div className="flex-1 min-w-0">
           <div className="flex items-start gap-2 mb-1">
-            <div 
+            <div
               className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
               style={{ backgroundColor: 'var(--theme-primary)22' }}
             >
@@ -301,7 +300,7 @@ export function NotificationPage() {
                 {getNotificationText(notification)}
               </p>
               {notification.type === "comment" && notification.content && (
-                <p 
+                <p
                   className="text-sm mt-1 italic"
                   style={{ color: 'var(--theme-text)', opacity: 0.7 }}
                 >
@@ -309,9 +308,9 @@ export function NotificationPage() {
                 </p>
               )}
               {notification.type === "buddy_request" && notification.content && (
-                <p 
+                <p
                   className="text-sm mt-2 p-3 rounded-xl"
-                  style={{ 
+                  style={{
                     backgroundColor: 'var(--theme-card-bg)',
                     color: 'var(--theme-text)',
                     opacity: 0.9,
@@ -364,7 +363,7 @@ export function NotificationPage() {
         </div>
 
         {!notification.is_read && (
-          <div 
+          <div
             className="w-2 h-2 rounded-full flex-shrink-0 mt-2"
             style={{ backgroundColor: 'var(--theme-primary)' }}
           />
@@ -412,14 +411,14 @@ export function NotificationPage() {
       </div>
 
       <Tabs defaultValue="all" className="w-full">
-        <TabsList 
+        <TabsList
           className="grid w-full grid-cols-3 mb-6 rounded-xl shadow-md"
           style={{ backgroundColor: 'var(--theme-accent)' }}
         >
           <TabsTrigger value="all" className="rounded-xl">
             All
             {unreadCount > 0 && (
-              <Badge 
+              <Badge
                 className="ml-2 px-2 py-0.5"
                 style={{
                   backgroundColor: 'var(--theme-primary)',
@@ -435,21 +434,21 @@ export function NotificationPage() {
           </TabsTrigger>
           <TabsTrigger value="buddy" className="rounded-xl">
             Talking Buddy
-            {notifications.filter(n => 
+            {notifications.filter(n =>
               (n.type === "buddy_request" || n.type === "buddy_accepted") && !n.is_read
             ).length > 0 && (
-              <Badge 
-                className="ml-2 px-2 py-0.5"
-                style={{
-                  backgroundColor: 'var(--theme-primary)',
-                  color: 'white',
-                }}
-              >
-                {notifications.filter(n => 
-                  (n.type === "buddy_request" || n.type === "buddy_accepted") && !n.is_read
-                ).length}
-              </Badge>
-            )}
+                <Badge
+                  className="ml-2 px-2 py-0.5"
+                  style={{
+                    backgroundColor: 'var(--theme-primary)',
+                    color: 'white',
+                  }}
+                >
+                  {notifications.filter(n =>
+                    (n.type === "buddy_request" || n.type === "buddy_accepted") && !n.is_read
+                  ).length}
+                </Badge>
+              )}
           </TabsTrigger>
         </TabsList>
 
@@ -460,9 +459,9 @@ export function NotificationPage() {
             ))
           ) : (
             <div className="text-center py-12">
-              <div 
+              <div
                 className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"
-                style={{ backgroundColor: 'var(--theme-accent)' }} 
+                style={{ backgroundColor: 'var(--theme-accent)' }}
               >
                 <CheckCheck className="w-8 h-8" style={{ color: 'var(--theme-primary)' }} />
               </div>
@@ -480,9 +479,9 @@ export function NotificationPage() {
             ))
           ) : (
             <div className="text-center py-12">
-              <div 
+              <div
                 className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"
-                style={{ backgroundColor: 'var(--theme-accent)' }} 
+                style={{ backgroundColor: 'var(--theme-accent)' }}
               >
                 <AtSign className="w-8 h-8" style={{ color: 'var(--theme-primary)' }} />
               </div>
@@ -500,9 +499,9 @@ export function NotificationPage() {
             ))
           ) : (
             <div className="text-center py-12">
-              <div 
+              <div
                 className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"
-                style={{ backgroundColor: 'var(--theme-accent)' }} 
+                style={{ backgroundColor: 'var(--theme-accent)' }}
               >
                 <Award className="w-8 h-8" style={{ color: 'var(--theme-primary)' }} />
               </div>

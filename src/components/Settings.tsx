@@ -198,10 +198,23 @@ export function Settings({ onLogout, username: usernameProp, userId, onUsernameU
     if (typed !== "DELETE") { toast.error("Account deletion cancelled."); return; }
     try {
       toast.info("Deleting account data…");
+      // Delete in FK-safe order: children first, then parents
+      await supabase.from("comment_likes").delete().eq("user_id", userId);
+      await supabase.from("comments").delete().eq("user_id", userId);
+      await supabase.from("post_likes").delete().eq("user_id", userId);
+      await supabase.from("saved_posts").delete().eq("user_id", userId);
+      await supabase.from("reading_history").delete().eq("user_id", userId);
+      await supabase.from("messages").delete().eq("sender_id", userId);
+      await supabase.from("chat_participants").delete().eq("user_id", userId);
+      await supabase.from("buddy_requests").delete().or(`from_user.eq.${userId},to_user.eq.${userId}`);
+      await supabase.from("buddies").delete().or(`user1_id.eq.${userId},user2_id.eq.${userId}`);
+      await supabase.from("collections").delete().eq("user_id", userId);
       await supabase.from("posts").delete().eq("user_id", userId);
       await supabase.from("follows").delete().eq("follower_id", userId);
       await supabase.from("follows").delete().eq("following_id", userId);
       await supabase.from("notifications").delete().eq("recipient_id", userId);
+      await supabase.from("notifications").delete().eq("sender_id", userId);
+      await supabase.from("matchmaking_queue").delete().eq("user_id", userId);
       await supabase.from("profiles").delete().eq("id", userId);
       await supabase.from("users").delete().eq("id", userId);
       await supabase.auth.signOut();

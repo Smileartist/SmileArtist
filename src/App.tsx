@@ -15,7 +15,7 @@ import { LibraryPage } from "./components/LibraryPage";
 import { WritePost } from "./components/WritePost";
 import { Login } from "./components/Login";
 import { Settings } from "./components/Settings";
-import { Sparkles, TrendingUp, BookOpen, Users } from "lucide-react";
+
 
 import { supabase } from "./utils/supabaseClient";
 import { LanguageProvider } from "./utils/LanguageContext";
@@ -31,9 +31,9 @@ export const UserDataContext = createContext<{
   avatarUrl: null,
   username: "",
   userId: "",
-  refreshAvatar: async () => {},
-  refreshUserData: async () => {},
-  onViewChange: () => {},
+  refreshAvatar: async () => { },
+  refreshUserData: async () => { },
+  onViewChange: () => { },
 });
 
 export const useUserData = () => useContext(UserDataContext);
@@ -181,7 +181,7 @@ function AppContent() {
   // ──────────────────────────────────────────────────────────────
 
   if (!isLoggedIn) {
-    return <Login onLogin={handleLogin} />; 
+    return <Login onLogin={handleLogin} />;
   }
 
   const renderContent = () => {
@@ -230,7 +230,7 @@ function AppContent() {
 
   return (
     <UserDataContext.Provider value={{ avatarUrl, username, userId, refreshAvatar, refreshUserData, onViewChange: handleViewChange }}>
-      <div 
+      <div
         className="min-h-screen transition-colors duration-300"
         style={{
           background: `linear-gradient(to bottom right, var(--theme-background), var(--theme-accent), var(--theme-accent)) `,

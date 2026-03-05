@@ -10,6 +10,7 @@ import { Badge } from "./ui/badge";
 import { Input } from "./ui/input";
 import { Textarea } from "./ui/textarea";
 import { supabase } from "../utils/supabaseClient";
+import { ensureUserExists } from "../utils/ensureUserExists";
 import { toast } from "sonner";
 import { Checkbox } from "./ui/checkbox";
 
@@ -27,6 +28,7 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [isFollowing, setIsFollowing] = useState(false);
   const [followerCount, setFollowerCount] = useState(0);
+  const [followingCount, setFollowingCount] = useState(0);
   const [followLoading, setFollowLoading] = useState(false);
 
   // Edit form state
@@ -45,11 +47,18 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
 
   const fetchFollowData = async (currId: string | null) => {
     if (!userId) return;
-    const { count } = await supabase
+    const { count: followers } = await supabase
       .from("follows")
       .select("*", { count: "exact", head: true })
       .eq("following_id", userId);
-    setFollowerCount(count ?? 0);
+    setFollowerCount(followers ?? 0);
+
+    // Fetch following count - how many people this user follows
+    const { count: following } = await supabase
+      .from("follows")
+      .select("*", { count: "exact", head: true })
+      .eq("follower_id", userId);
+    setFollowingCount(following ?? 0);
 
     if (currId && currId !== userId) {
       const { data } = await supabase
@@ -107,7 +116,7 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
           .select("*")
           .eq("id", userId)
           .maybeSingle();
-        
+
         if (profileError) throw profileError;
         if (profile) {
           setProfileData(profile);
@@ -132,7 +141,7 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
           setEditMotivatorTitle("");
           setEditMotivatorBio("");
         }
-        
+
         const { data: posts, error: postsError } = await supabase
           .from("posts")
           .select("*")
@@ -221,17 +230,17 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
     // Set buddy count to the number of unique buddies
     setBuddyCount(uniqueBuddyIds.size);
 
-    const profiles = await Promise.all(
-      Array.from(uniqueBuddyIds).map(async (buddyId) => {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('id, full_name, username, avatar_url')
-          .eq('id', buddyId)
-          .maybeSingle();
-        return profile;
-      })
-    );
-    setBuddiesList(profiles.filter(Boolean));
+    // Batch-fetch all buddy profiles in one query instead of N+1
+    const buddyIds = Array.from(uniqueBuddyIds);
+    if (buddyIds.length > 0) {
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, full_name, username, avatar_url')
+        .in('id', buddyIds);
+      setBuddiesList(profiles || []);
+    } else {
+      setBuddiesList([]);
+    }
   };
 
   const [buddyStatus, setBuddyStatus] = useState<null | 'pending_sent' | 'pending_received' | 'accepted'>(null);
@@ -253,19 +262,7 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
     else setBuddyStatus('pending_received');
   };
 
-  // Ensure user row exists (FK requirement for notifications)
-  const ensureUserExists = async (uid: string) => {
-    const { data } = await supabase.from("users").select("id").eq("id", uid).maybeSingle();
-    if (!data) {
-      const { data: profile } = await supabase.from("profiles").select("username, full_name").eq("id", uid).maybeSingle();
-      await supabase.from("users").insert({
-        id: uid,
-        username: profile?.username || "user",
-        name: profile?.full_name || profile?.username || "user",
-        full_name: profile?.full_name || profile?.username || "user",
-      });
-    }
-  };
+  // ensureUserExists is now imported from ../utils/ensureUserExists
 
   const sendBuddyRequest = async () => {
     if (!currentUserId) return;
@@ -402,9 +399,6 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
         updated_at: new Date().toISOString(),
       };
 
-      console.log("Attempting to update profile for user ID:", authUser.id);
-      console.log("Data being sent:", updateData);
-
       // Explicitly use .update() since ProfilePage is for existing profiles
       const { data, error } = await supabase
         .from("profiles")
@@ -418,14 +412,12 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
         if (error.hint) console.error("Error hint:", error.hint);
         throw error;
       }
-      
-      console.log("Supabase update successful, received data:", data);
 
       setAvatarFile(null);
       setCoverFile(null);
       toast.success("Profile updated successfully!");
       setIsEditing(false);
-      await fetchProfileData(); 
+      await fetchProfileData();
       await refreshAvatar();
     } catch (error: any) {
       console.error("Final error during profile update:", error);
@@ -452,10 +444,10 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
     stats: {
       posts: userPosts.length,
       followers: followerCount,
-      following: 0,
+      following: followingCount,
     },
     interests: profileData?.interests || [],
-  }), [profileData, userPosts, followerCount]); // Depend on profileData, userPosts, and followerCount
+  }), [profileData, userPosts, followerCount, followingCount]);
 
   if (loading && !profileData) {
     return (
@@ -468,7 +460,7 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
   return (
     <div className="max-w-4xl mx-auto pb-12">
       {/* Cover Section */}
-      <div 
+      <div
         className="w-full h-48 md:h-64 rounded-3xl overflow-hidden mb-6 shadow-lg relative group"
         style={{
           backgroundImage: `url(${coverFile ? URL.createObjectURL(coverFile) : profileUser.coverImage})`,
@@ -479,18 +471,18 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
         {isEditing && isOwnProfile && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity gap-3">
             <div className="flex gap-4">
-              <label 
-                htmlFor="cover-upload" 
+              <label
+                htmlFor="cover-upload"
                 className="cursor-pointer bg-white px-6 py-2.5 rounded-2xl text-sm font-bold flex items-center shadow-xl hover:bg-gray-100 transition-all"
                 style={{ color: '#000000' }}
               >
                 <Upload className="w-4 h-4 mr-2" style={{ color: '#000000' }} /> UPLOAD COVER
               </label>
               <input id="cover-upload" type="file" accept="image/*" className="hidden" onChange={(e) => setCoverFile(e.target.files?.[0] || null)} />
-              
+
               {(editCoverUrl || coverFile) && (
                 <Button variant="destructive" size="default" onClick={() => { setEditCoverUrl(""); setCoverFile(null); }} className="rounded-2xl px-6 font-bold shadow-xl">
-                  <Trash2 className="w-4 h-4 mr-2"/> DELETE COVER
+                  <Trash2 className="w-4 h-4 mr-2" /> DELETE COVER
                 </Button>
               )}
             </div>
@@ -511,10 +503,10 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
 
             {isEditing && isOwnProfile && (
               <div className="flex gap-2 w-full justify-center md:justify-start">
-                <Button 
+                <Button
                   asChild
-                  variant="outline" 
-                  size="sm" 
+                  variant="outline"
+                  size="sm"
                   className="rounded-xl flex-1 md:flex-none border-dashed"
                   style={{ borderColor: 'var(--theme-primary)', color: 'var(--theme-primary)' }}
                 >
@@ -524,11 +516,11 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
                     <input id="avatar-upload" type="file" accept="image/*" className="hidden" onChange={(e) => setAvatarFile(e.target.files?.[0] || null)} />
                   </label>
                 </Button>
-                
+
                 {(editAvatarUrl || avatarFile) && (
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
+                  <Button
+                    variant="outline"
+                    size="sm"
                     className="rounded-xl flex-1 md:flex-none text-red-500 border-red-200 hover:bg-red-50 hover:text-red-600"
                     onClick={() => { setEditAvatarUrl(""); setAvatarFile(null); }}
                   >
@@ -540,9 +532,9 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
             )}
 
             {profileUser.isMotivator && (
-              <Badge 
+              <Badge
                 className="px-4 py-1 shadow-md"
-                style={{ 
+                style={{
                   backgroundColor: 'var(--theme-primary)',
                   color: 'white',
                 }}
@@ -692,13 +684,13 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
                   <label className="text-xs font-bold opacity-70 mb-1 block" style={{ color: "var(--theme-text)" }}>Location</label>
                   <Input value={editLocation} onChange={(e) => setEditLocation(e.target.value)} className="bg-[var(--theme-card-bg)] rounded-xl border-[var(--theme-primary)]/20" />
                 </div>
-                
+
                 <div className="p-4 rounded-2xl bg-[var(--theme-accent)]/20 border border-[var(--theme-primary)]/10">
                   <div className="flex items-center space-x-2 mb-4">
                     <Checkbox id="editIsMotivator" checked={editIsMotivator} onCheckedChange={(checked: boolean) => setEditIsMotivator(checked === true)} />
                     <label htmlFor="editIsMotivator" className="text-sm font-bold" style={{ color: "var(--theme-text)" }}>I am a Motivator</label>
                   </div>
-                  
+
                   {editIsMotivator && (
                     <div className="space-y-4 animate-in fade-in slide-in-from-top-1">
                       <div>
@@ -723,9 +715,9 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
                       </Badge>
                     ))}
                   </div>
-                  <Input 
-                    value={newInterest} 
-                    onChange={(e) => setNewInterest(e.target.value)} 
+                  <Input
+                    value={newInterest}
+                    onChange={(e) => setNewInterest(e.target.value)}
                     onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
                       if (e.key === 'Enter' && newInterest.trim() !== '') {
                         e.preventDefault();
@@ -735,16 +727,16 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
                         setNewInterest('');
                       }
                     }}
-                    className="bg-[var(--theme-card-bg)] rounded-xl border-[var(--theme-primary)]/20" 
-                    placeholder="Type and press Enter to add tags..." 
+                    className="bg-[var(--theme-card-bg)] rounded-xl border-[var(--theme-primary)]/20"
+                    placeholder="Type and press Enter to add tags..."
                   />
                 </div>
 
                 <div className="flex gap-2 pt-2">
-                  <Button 
-                    onClick={handleUpdateProfile} 
+                  <Button
+                    onClick={handleUpdateProfile}
                     disabled={loading}
-                    className="rounded-xl flex-1 text-white font-bold h-12 shadow-lg" 
+                    className="rounded-xl flex-1 text-white font-bold h-12 shadow-lg"
                     style={{ background: "linear-gradient(to right, var(--theme-primary), var(--theme-secondary))" }}
                   >
                     {loading ? "SAVING..." : <><Save className="w-4 h-4 mr-2" /> SAVE PROFILE</>}
@@ -913,7 +905,7 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
                   <h4 className="text-sm font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--theme-primary)' }}>Bio</h4>
                   <p className="leading-relaxed" style={{ color: 'var(--theme-text)', opacity: 0.8 }}>{profileUser.bio}</p>
                 </div>
-                
+
                 <div className="p-4 rounded-2xl bg-[var(--theme-accent)]/20">
                   <h4 className="text-sm font-bold uppercase tracking-wider mb-3" style={{ color: 'var(--theme-primary)' }}>Motivator Status</h4>
                   <div className="flex items-center gap-2 mb-4">

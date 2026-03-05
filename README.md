@@ -35,7 +35,6 @@ Smile Artist is a platform designed to foster a supportive community where users
 *   **Hono:** A small, simple, and ultrafast web framework for the Edge.
 
 ### Other Tools & Libraries
-*   **`react-router-dom`:** For client-side routing.
 *   **`react-hook-form`:** For flexible and extensible forms with easy validation.
 *   **`recharts`:** A composable charting library built on React components.
 *   **`sonner`:** An opinionated toast component for React.

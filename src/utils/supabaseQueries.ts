@@ -47,6 +47,12 @@ export interface User {
 // HELPER FUNCTIONS
 // =========================================
 
+/** Escape special characters that could manipulate Supabase PostgREST filters */
+const sanitizeSearchQuery = (query: string): string => {
+  // Remove characters that have special meaning in PostgREST filter syntax
+  return query.replace(/[%_\\(),.]/g, (char) => `\\${char}`);
+};
+
 const getTimeFilterDate = (timeFilter: "today" | "week" | "month" | "all"): Date | null => {
   const now = new Date();
   switch (timeFilter) {
@@ -112,12 +118,12 @@ export const getTrendingPosts = async (timeFilter: "today" | "week" | "month" | 
 
   return (data as any[]).map(rawPost => {
     const author = Array.isArray(rawPost.author) ? rawPost.author[0] : rawPost.author;
-    
+
     return {
       postId: rawPost.id,
       title: rawPost.title || "Untitled",
       content: rawPost.content,
-      user_id: rawPost.user_id || "", 
+      user_id: rawPost.user_id || "",
       created_at: rawPost.created_at,
       likes: rawPost.likes,
       comments: rawPost.comments,
@@ -163,7 +169,7 @@ export const getTrendingAuthors = async (timeFilter: "today" | "week" | "month" 
 
   (postsDataRaw as any[]).forEach(post => {
     const author = Array.isArray(post.author) ? post.author[0] : post.author;
-    
+
     if (post.user_id && author && author.full_name && author.username && author.avatar_url) {
       const authorId = post.user_id;
       if (!authorStats[authorId]) {
@@ -193,7 +199,7 @@ export const getTrendingTopics = async (timeFilter: "today" | "week" | "month" |
   let query = supabase
     .from("posts")
     .select(`category, id`);
-  
+
   const filterDate = getTimeFilterDate(timeFilter);
   if (filterDate) {
     query = query.gte("created_at", filterDate.toISOString());
@@ -222,11 +228,11 @@ export const getTrendingTopics = async (timeFilter: "today" | "week" | "month" |
 
   const sortedTopics = Object.entries(topicCounts)
     .sort(([, countA], [, countB]) => countB - countA)
-    .slice(0, 5) 
+    .slice(0, 5)
     .map(([name, count]) => ({
       name,
-      count: `${count} posts`, 
-      trending: "N/A", 
+      count: `${count} posts`,
+      trending: "N/A",
     }));
 
   return sortedTopics;
@@ -246,7 +252,7 @@ export const findBuddyMatch = async (userId: string, role: "listener" | "seeker"
     console.error("Matchmaking error desarialise:", error);
     throw error;
   }
-  return data; 
+  return data;
 };
 
 export const sendBuddyMessage = async (chatId: string, userId: string, content: string, id?: string) => {
@@ -380,7 +386,7 @@ export const searchPosts = async (query: string): Promise<Post[]> => {
       )
     `
     )
-    .or(`title.ilike.%${query}%,content.ilike.%${query}%,category.ilike.%${query}%`);
+    .or(`title.ilike.%${sanitizeSearchQuery(query)}%,content.ilike.%${sanitizeSearchQuery(query)}%,category.ilike.%${sanitizeSearchQuery(query)}%`);
 
   if (error) {
     console.error("Error searching posts desarialise:", error);
@@ -389,13 +395,13 @@ export const searchPosts = async (query: string): Promise<Post[]> => {
 
   return (data as any[]).map(rawPost => {
     const author = Array.isArray(rawPost.author) ? rawPost.author[0] : rawPost.author;
-    
+
     return {
       postId: rawPost.id,
       title: rawPost.title || "Untitled",
       content: rawPost.content,
-      user_id: rawPost.user_id || "", 
-      created_at: rawPost.created_at, 
+      user_id: rawPost.user_id || "",
+      created_at: rawPost.created_at,
       likes: rawPost.likes,
       comments: rawPost.comments,
       category: rawPost.category || "",
@@ -421,7 +427,7 @@ export const searchUsers = async (query: string): Promise<User[]> => {
       avatar_url
     `
     )
-    .or(`full_name.ilike.%${query}%,username.ilike.%${query}%`);
+    .or(`full_name.ilike.%${sanitizeSearchQuery(query)}%,username.ilike.%${sanitizeSearchQuery(query)}%`);
 
   if (error) {
     console.error("Error searching users desarialise:", error);

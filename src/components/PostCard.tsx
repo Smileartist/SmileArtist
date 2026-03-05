@@ -35,7 +35,10 @@ export function PostCard({ post }: PostCardProps) {
 
   useEffect(() => {
     const checkState = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      if (!currentUserId) {
+        setLiked(false);
+        return;
+      }
 
       // ✅ Always fetch real like count from post_likes
       const { count } = await supabase
@@ -45,16 +48,11 @@ export function PostCard({ post }: PostCardProps) {
 
       setLikeCount(count || 0);
 
-      if (!user) {
-        setLiked(false);
-        return;
-      }
-
       const { data: likeRow } = await supabase
         .from("post_likes")
         .select("post_id")
         .eq("post_id", postId)
-        .eq("user_id", user.id)
+        .eq("user_id", currentUserId)
         .maybeSingle();
 
       setLiked(!!likeRow);
@@ -63,7 +61,7 @@ export function PostCard({ post }: PostCardProps) {
         .from("saved_posts")
         .select("post_id")
         .eq("post_id", postId)
-        .eq("user_id", user.id)
+        .eq("user_id", currentUserId)
         .maybeSingle();
 
       if (saveRow) setSaved(true);
@@ -71,26 +69,25 @@ export function PostCard({ post }: PostCardProps) {
 
     checkState();
 
-  }, [postId]);
+  }, [postId, currentUserId]);
 
   const handleLike = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return alert("Login required");
+    if (!currentUserId) return alert("Login required");
 
     const prevLiked = liked || false;
     const prevLikeCount = likeCount;
 
-    // Optimistic UI (kept same logic)
+    // Optimistic UI
     setLiked(!prevLiked);
     setLikeCount(prevLiked ? Math.max(0, prevLikeCount - 1) : prevLikeCount + 1);
 
     try {
-      const { newLikes, isLiked } = await handleLikeUtil(postId, prevLikeCount, user.id);
+      const { newLikes, isLiked } = await handleLikeUtil(postId, prevLikeCount, currentUserId);
 
       setLiked(isLiked);
       setLikeCount(newLikes);
 
-      // 🔥 Safety: re-fetch true count to avoid drift
+      // Safety: re-fetch true count to avoid drift
       const { count } = await supabase
         .from("post_likes")
         .select("*", { count: "exact", head: true })
@@ -106,14 +103,13 @@ export function PostCard({ post }: PostCardProps) {
   };
 
   const handleSave = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return alert("Login required");
+    if (!currentUserId) return alert("Login required");
 
     const prevSaved = saved;
     setSaved(!prevSaved);
 
     try {
-      const isSaved = await handleSaveUtil(postId, user.id);
+      const isSaved = await handleSaveUtil(postId, currentUserId);
       setSaved(isSaved);
     } catch (error) {
       setSaved(prevSaved);
@@ -146,6 +142,13 @@ export function PostCard({ post }: PostCardProps) {
   };
 
   const handleReport = () => {
+    const reports = JSON.parse(localStorage.getItem("smileArtist_reports") || "[]");
+    reports.push({
+      postId,
+      reportedBy: currentUserId,
+      reportedAt: new Date().toISOString(),
+    });
+    localStorage.setItem("smileArtist_reports", JSON.stringify(reports));
     toast.success("Post reported. Thank you for keeping the community safe. 🙏");
   };
 

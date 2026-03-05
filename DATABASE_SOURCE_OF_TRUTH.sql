@@ -53,6 +53,7 @@ create table posts (
   comments integer default 0,
   category text,
   categories text[],
+  type text default 'poem',
   created_at timestamptz default now()
 );
 
@@ -476,3 +477,22 @@ foreign key (from_user) references profiles(id);
 alter table buddy_requests
 add constraint fk_buddy_requests_to
 foreign key (to_user) references profiles(id);
+
+
+-- ========================
+-- ATOMIC COMMENT COUNT INCREMENT
+-- (Prevents race conditions when multiple users comment simultaneously)
+-- ========================
+CREATE OR REPLACE FUNCTION increment_comment_count(p_post_id uuid)
+RETURNS void AS $$
+BEGIN
+  UPDATE posts SET comments = comments + 1 WHERE id = p_post_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+
+-- ========================
+-- MIGRATION: Add type column to existing posts table
+-- (Run this if the posts table already exists)
+-- ========================
+-- ALTER TABLE posts ADD COLUMN IF NOT EXISTS type text DEFAULT 'poem';

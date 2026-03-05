@@ -1,5 +1,5 @@
- import { useState } from "react";
-import { PenTool, Type, Send, Image as ImageIcon, X } from "lucide-react";
+import { useState, useEffect } from "react";
+import { PenTool, Type, Send, FileText, Mail, X } from "lucide-react";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "./ui/tabs";
@@ -13,8 +13,8 @@ export function WritePost() {
   const [isPublishing, setIsPublishing] = useState(false);
 
   const suggestedCategories = [
-    "Love", "Heartbreak", "Nature", "Urban Life", "Healing", 
-    "Self Discovery", "Haiku", "Modern Life", "Resilience", 
+    "Love", "Heartbreak", "Nature", "Urban Life", "Healing",
+    "Self Discovery", "Haiku", "Modern Life", "Resilience",
     "Daily Life", "Inspiration", "Motivation", "Friendship"
   ];
 
@@ -28,6 +28,27 @@ export function WritePost() {
     setSelectedCategories(selectedCategories.filter(c => c !== cat));
   };
 
+  // Load draft from localStorage on mount
+  useEffect(() => {
+    const draft = localStorage.getItem("smileArtist_draft");
+    if (draft) {
+      try {
+        const parsed = JSON.parse(draft);
+        if (parsed.title) setTitle(parsed.title);
+        if (parsed.content) setContent(parsed.content);
+        if (parsed.selectedCategories) setSelectedCategories(parsed.selectedCategories);
+      } catch { /* ignore corrupted drafts */ }
+    }
+  }, []);
+
+  const handleSaveDraft = () => {
+    localStorage.setItem(
+      "smileArtist_draft",
+      JSON.stringify({ title, content, selectedCategories })
+    );
+    toast.success("Draft saved! ✏️");
+  };
+
   const handlePublish = async (type: string) => {
     if (!content.trim()) {
       toast.error("Please write something before publishing.");
@@ -37,32 +58,29 @@ export function WritePost() {
     setIsPublishing(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      
+
       if (!user) {
         toast.error("You must be logged in to publish.");
         return;
       }
 
-      // // Fetch user profile for display name and avatar
-      // const { data: profile } = await supabase
-      //   .from("profiles")
-      //   .select("username, avatar_url")
-      //   .eq("id", user.id)
-      //   .single();
-
-     const { error } = await supabase.from("posts").insert([
-  {
-    title: title.trim() || (type === 'haiku' ? 'Untitled Haiku' : 'Untitled'),
-    content: content.trim(),
-    categories: selectedCategories,
-    user_id: user.id,
-    created_at: new Date().toISOString(),
-  },
-]);
+      const { error } = await supabase.from("posts").insert([
+        {
+          title: title.trim() || (type === 'unsent_letter' ? 'Unsent Letter' : 'Untitled'),
+          content: content.trim(),
+          category: selectedCategories[0] || 'General',
+          categories: selectedCategories,
+          type: type,
+          user_id: user.id,
+          created_at: new Date().toISOString(),
+        },
+      ]);
 
 
       if (error) throw error;
 
+      // Clear draft after successful publish
+      localStorage.removeItem("smileArtist_draft");
       toast.success("Post published successfully!");
       setTitle("");
       setContent("");
@@ -80,7 +98,7 @@ export function WritePost() {
       {/* Header */}
       <div className="mb-6">
         <div className="flex items-center gap-3 mb-2">
-          <div 
+          <div
             className="w-12 h-12 rounded-full flex items-center justify-center"
             style={{ backgroundColor: 'var(--theme-accent)' }}
           >
@@ -93,10 +111,9 @@ export function WritePost() {
         </p>
       </div>
 
-      {/* Writing Mode Tabs */}
       <Tabs defaultValue="poem" className="mb-6">
-        <TabsList 
-          className="grid w-full grid-cols-3 mb-6 rounded-xl shadow-md"
+        <TabsList
+          className="grid w-full grid-cols-4 mb-6 rounded-xl shadow-md"
           style={{ backgroundColor: 'var(--theme-accent)' }}
         >
           <TabsTrigger value="poem" className="rounded-xl">
@@ -107,14 +124,18 @@ export function WritePost() {
             <PenTool className="w-4 h-4 mr-2" />
             Story
           </TabsTrigger>
-          <TabsTrigger value="haiku" className="rounded-xl">
-            <Type className="w-4 h-4 mr-2" />
-            Haiku
+          <TabsTrigger value="article" className="rounded-xl">
+            <FileText className="w-4 h-4 mr-2" />
+            Article
+          </TabsTrigger>
+          <TabsTrigger value="unsent_letter" className="rounded-xl">
+            <Mail className="w-4 h-4 mr-2" />
+            Unsent Letter
           </TabsTrigger>
         </TabsList>
 
         <TabsContent value="poem">
-          <WriteForm 
+          <WriteForm
             title={title}
             setTitle={setTitle}
             content={content}
@@ -124,6 +145,7 @@ export function WritePost() {
             suggestedCategories={suggestedCategories}
             handleAddCategory={handleAddCategory}
             handlePublish={() => handlePublish("poem")}
+            handleSaveDraft={handleSaveDraft}
             isPublishing={isPublishing}
             placeholder="Let your emotions flow through verses..."
             titlePlaceholder="Your Poem's Title"
@@ -131,7 +153,7 @@ export function WritePost() {
         </TabsContent>
 
         <TabsContent value="story">
-          <WriteForm 
+          <WriteForm
             title={title}
             setTitle={setTitle}
             content={content}
@@ -141,14 +163,15 @@ export function WritePost() {
             suggestedCategories={suggestedCategories}
             handleAddCategory={handleAddCategory}
             handlePublish={() => handlePublish("story")}
+            handleSaveDraft={handleSaveDraft}
             isPublishing={isPublishing}
             placeholder="Tell your story in prose..."
             titlePlaceholder="Your Story's Title"
           />
         </TabsContent>
 
-        <TabsContent value="haiku">
-          <WriteForm 
+        <TabsContent value="article">
+          <WriteForm
             title={title}
             setTitle={setTitle}
             content={content}
@@ -157,10 +180,29 @@ export function WritePost() {
             handleRemoveCategory={handleRemoveCategory}
             suggestedCategories={suggestedCategories}
             handleAddCategory={handleAddCategory}
-            handlePublish={() => handlePublish("haiku")}
+            handlePublish={() => handlePublish("article")}
+            handleSaveDraft={handleSaveDraft}
             isPublishing={isPublishing}
-            placeholder="Three lines, 5-7-5 syllables..."
-            titlePlaceholder="Your Haiku's Title (optional)"
+            placeholder="Share your thoughts and ideas..."
+            titlePlaceholder="Your Article's Title"
+          />
+        </TabsContent>
+
+        <TabsContent value="unsent_letter">
+          <WriteForm
+            title={title}
+            setTitle={setTitle}
+            content={content}
+            setContent={setContent}
+            selectedCategories={selectedCategories}
+            handleRemoveCategory={handleRemoveCategory}
+            suggestedCategories={suggestedCategories}
+            handleAddCategory={handleAddCategory}
+            handlePublish={() => handlePublish("unsent_letter")}
+            handleSaveDraft={handleSaveDraft}
+            isPublishing={isPublishing}
+            placeholder="Write the words you never sent..."
+            titlePlaceholder="Dear..."
           />
         </TabsContent>
       </Tabs>
@@ -178,6 +220,7 @@ interface WriteFormProps {
   suggestedCategories: string[];
   handleAddCategory: (cat: string) => void;
   handlePublish: () => void;
+  handleSaveDraft: () => void;
   placeholder: string;
   titlePlaceholder: string;
   isPublishing: boolean;
@@ -193,6 +236,7 @@ function WriteForm({
   suggestedCategories,
   handleAddCategory,
   handlePublish,
+  handleSaveDraft,
   placeholder,
   titlePlaceholder,
   isPublishing,
@@ -200,7 +244,7 @@ function WriteForm({
   return (
     <div className="space-y-6">
       {/* Title Input */}
-      <div 
+      <div
         className="p-6 rounded-2xl shadow-md"
         style={{
           backgroundColor: 'var(--theme-card-bg)',
@@ -213,7 +257,7 @@ function WriteForm({
           onChange={(e) => setTitle(e.target.value)}
           placeholder={titlePlaceholder}
           className="w-full text-2xl outline-none bg-transparent"
-          style={{ 
+          style={{
             color: 'var(--theme-text)',
             fontFamily: 'var(--theme-font-family)',
           }}
@@ -221,7 +265,7 @@ function WriteForm({
       </div>
 
       {/* Content Textarea */}
-      <div 
+      <div
         className="p-6 rounded-2xl shadow-md"
         style={{
           backgroundColor: 'var(--theme-card-bg)',
@@ -234,7 +278,7 @@ function WriteForm({
           placeholder={placeholder}
           rows={12}
           className="w-full outline-none resize-none bg-transparent"
-          style={{ 
+          style={{
             color: 'var(--theme-text)',
             fontFamily: 'var(--theme-font-family)',
             fontSize: '16px',
@@ -242,7 +286,7 @@ function WriteForm({
           }}
         />
         <div className="mt-4 flex items-center justify-between">
-          <span 
+          <span
             className="text-sm"
             style={{ color: 'var(--theme-text)', opacity: 0.5 }}
           >
@@ -252,7 +296,7 @@ function WriteForm({
       </div>
 
       {/* Categories */}
-      <div 
+      <div
         className="p-6 rounded-2xl shadow-md"
         style={{
           backgroundColor: 'var(--theme-card-bg)',
@@ -262,12 +306,12 @@ function WriteForm({
         <h3 className="mb-3" style={{ color: 'var(--theme-text)' }}>
           Categories (Max 3)
         </h3>
-        
+
         {/* Selected Categories */}
         {selectedCategories.length > 0 && (
           <div className="flex flex-wrap gap-2 mb-4">
             {selectedCategories.map((cat) => (
-              <Badge 
+              <Badge
                 key={cat}
                 className="px-3 py-1 flex items-center gap-2 cursor-pointer"
                 style={{
@@ -292,8 +336,8 @@ function WriteForm({
               disabled={selectedCategories.includes(cat) || selectedCategories.length >= 3}
               className="px-3 py-1 rounded-lg text-sm transition-all disabled:opacity-30 disabled:cursor-not-allowed"
               style={{
-                backgroundColor: selectedCategories.includes(cat) 
-                  ? 'var(--theme-primary)33' 
+                backgroundColor: selectedCategories.includes(cat)
+                  ? 'var(--theme-primary)33'
                   : 'var(--theme-accent)',
                 color: 'var(--theme-primary)',
                 border: `1px solid ${selectedCategories.includes(cat) ? 'var(--theme-primary)' : 'transparent'}`,
@@ -314,6 +358,7 @@ function WriteForm({
             borderColor: 'var(--theme-primary)',
             color: 'var(--theme-primary)',
           }}
+          onClick={handleSaveDraft}
         >
           Save Draft
         </Button>

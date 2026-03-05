@@ -1,4 +1,5 @@
 import { supabase } from "./supabaseClient";
+import { ensureUserExists } from "./ensureUserExists";
 
 export async function handleLike(
   postId: string,
@@ -66,26 +67,7 @@ export async function handleSave(
 ): Promise<boolean> {
   try {
     // Ensure the user exists in the `users` table (FK constraint for saved_posts).
-    const { data: existingUser } = await supabase
-      .from("users")
-      .select("id")
-      .eq("id", userId)
-      .maybeSingle();
-
-    if (!existingUser) {
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("username, full_name")
-        .eq("id", userId)
-        .maybeSingle();
-
-      await supabase.from("users").insert({
-        id: userId,
-        username: profile?.username || "user",
-        name: profile?.full_name || profile?.username || "user",
-        full_name: profile?.full_name || profile?.username || "user",
-      });
-    }
+    await ensureUserExists(userId);
 
     // Check if the post is already saved by the user
     const { data: existingSave, error: checkError } = await supabase
@@ -146,26 +128,7 @@ export async function handleComment(
     }
 
     // Ensure the user exists in the `users` table (FK constraint for comments).
-    const { data: existingUser } = await supabase
-      .from("users")
-      .select("id")
-      .eq("id", userId)
-      .maybeSingle();
-
-    if (!existingUser) {
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("username, full_name")
-        .eq("id", userId)
-        .maybeSingle();
-
-      await supabase.from("users").insert({
-        id: userId,
-        username: profile?.username || "user",
-        name: profile?.full_name || profile?.username || "user",
-        full_name: profile?.full_name || profile?.username || "user",
-      });
-    }
+    await ensureUserExists(userId);
 
     const { error: insertError } = await supabase
       .from("comments")
@@ -180,21 +143,29 @@ export async function handleComment(
 
     if (insertError) throw insertError;
 
-    // Update the comments count in the posts table
-    const { data: postData } = await supabase
-      .from("posts")
-      .select("comments")
-      .eq("id", postId)
-      .single();
+    // Atomically increment the comment count to avoid race conditions
+    const { error: rpcError } = await supabase.rpc("increment_comment_count", {
+      p_post_id: postId,
+    });
 
-    const newCommentsCount = (postData?.comments || 0) + 1;
+    // Fallback: if the RPC doesn't exist yet, use the old read-then-write approach
+    if (rpcError) {
+      console.warn("increment_comment_count RPC not available, falling back:", rpcError.message);
+      const { data: postData } = await supabase
+        .from("posts")
+        .select("comments")
+        .eq("id", postId)
+        .single();
 
-    const { error: updateError } = await supabase
-      .from("posts")
-      .update({ comments: newCommentsCount })
-      .eq("id", postId);
+      const newCommentsCount = (postData?.comments || 0) + 1;
 
-    if (updateError) throw updateError;
+      const { error: updateError } = await supabase
+        .from("posts")
+        .update({ comments: newCommentsCount })
+        .eq("id", postId);
+
+      if (updateError) throw updateError;
+    }
 
     console.log("Comment added successfully!");
   } catch (error) {

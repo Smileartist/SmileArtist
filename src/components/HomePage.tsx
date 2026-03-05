@@ -41,7 +41,8 @@ export function HomePage() {
               avatar_url
             )
           `)
-          .order("created_at", { ascending: false });
+          .order("created_at", { ascending: false })
+          .limit(50);
 
         if (error) throw error;
 
