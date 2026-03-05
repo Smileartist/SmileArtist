@@ -2,7 +2,7 @@ import { Bell, User, Menu, PenTool, Sparkles, Settings as SettingsIcon, BookOpen
 import { Button } from "./ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { useUserData } from "../App";
-import logo from "figma:asset/f15460e64ff6dd326797f0cc15f4e18e934e3112.png";
+import logo from "../assets/logo.png";
 
 interface MobileHeaderProps {
   onMenuClick?: () => void;
@@ -13,7 +13,7 @@ interface MobileHeaderProps {
 export function MobileHeader({ onMenuClick, onViewChange, activeView }: MobileHeaderProps) {
   const { avatarUrl } = useUserData();
   return (
-    <header 
+    <header
       className="md:hidden fixed top-0 left-0 right-0 backdrop-blur-md border-b z-40 shadow-sm"
       style={{
         backgroundColor: 'var(--theme-background)',
@@ -41,9 +41,9 @@ export function MobileHeader({ onMenuClick, onViewChange, activeView }: MobileHe
           </Button>
         </div>
         <div className="col-start-2 justify-self-center flex items-center gap-2">
-          <img 
-            src={logo} 
-            alt="Smile Artist" 
+          <img
+            src={logo}
+            alt="Smile Artist"
             className="h-12 object-contain"
           />
         </div>
@@ -103,9 +103,9 @@ export function MobileHeader({ onMenuClick, onViewChange, activeView }: MobileHe
               </Button>
             </div>
           ) : (
-            <Button 
-              variant="ghost" 
-              size="icon" 
+            <Button
+              variant="ghost"
+              size="icon"
               className="h-11 w-11"
               onClick={() => onViewChange?.("notifications")}
               style={{

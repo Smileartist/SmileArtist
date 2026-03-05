@@ -8,7 +8,7 @@ export default defineConfig({
   resolve: {
     extensions: ['.js', '.jsx', '.ts', '.tsx', '.json'],
     alias: {
-      'figma:asset/f15460e64ff6dd326797f0cc15f4e18e934e3112.png': path.resolve(__dirname, './src/assets/f15460e64ff6dd326797f0cc15f4e18e934e3112.png'),
+
       '@': path.resolve(__dirname, './src'),
     },
   },

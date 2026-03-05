@@ -1,7 +1,7 @@
 # Smile Artist
 
 <div align="center">
-  <img src="./public/favicon.ico" alt="Smile Artist Logo" width="120" />
+  <img src="./src/assets/logo.png" alt="Smile Artist Logo" width="120" />
 </div>
 
 <div align="center">
