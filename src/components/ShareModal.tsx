@@ -132,110 +132,110 @@ export function ShareModal({
   };
 
   const handleSend = async () => {
-  if (selected.size === 0) return;
-  setSending(true);
+    if (selected.size === 0) return;
+    setSending(true);
 
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) { setSending(false); return; }
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { setSending(false); return; }
 
-  const preview =
-    postContent.length > 120
-      ? postContent.slice(0, 120) + "…"
-      : postContent;
+    const preview =
+      postContent.length > 120
+        ? postContent.slice(0, 120) + "…"
+        : postContent;
 
-  const messageText = postTitle
-    ? `📖 *${postTitle}*\n\n${preview}`
-    : `📖 ${preview}`;
+    const messageText = postTitle
+      ? `📖 *${postTitle}*\n\n${preview}`
+      : `📖 ${preview}`;
 
-  try {
-    for (const buddyId of selected) {
+    try {
+      for (const buddyId of selected) {
 
-      // 🔍 Check if chat already exists via participants
-      const { data: myChats, error: chatsError } = await supabase
-        .from("chat_participants")
-        .select("chat_id")
-        .eq("user_id", user.id);
+        // 🔍 Check if chat already exists via participants
+        const { data: myChats, error: chatsError } = await supabase
+          .from("chat_participants")
+          .select("chat_id")
+          .eq("user_id", user.id);
 
-      if (chatsError) throw chatsError;
+        if (chatsError) throw chatsError;
 
-      let chatId: string | null = null;
+        let chatId: string | null = null;
 
-      if (myChats && myChats.length > 0) {
-        for (const chat of myChats) {
-          const { data: participants } = await supabase
-            .from("chat_participants")
-            .select("user_id")
-            .eq("chat_id", chat.chat_id);
+        if (myChats && myChats.length > 0) {
+          for (const chat of myChats) {
+            const { data: participants } = await supabase
+              .from("chat_participants")
+              .select("user_id")
+              .eq("chat_id", chat.chat_id);
 
-          const ids = participants?.map(p => p.user_id) || [];
+            const ids = participants?.map(p => p.user_id) || [];
 
-          if (ids.includes(buddyId) && ids.includes(user.id)) {
-            chatId = chat.chat_id;
-            break;
+            if (ids.includes(buddyId) && ids.includes(user.id)) {
+              chatId = chat.chat_id;
+              break;
+            }
           }
         }
-      }
 
-      // ➕ Create new chat if none exists (UUID auto-generated)
-      if (!chatId) {
-        const { data: newChat, error: chatError } = await supabase
-          .from("chats")
+        // ➕ Create new chat if none exists (UUID auto-generated)
+        if (!chatId) {
+          const { data: newChat, error: chatError } = await supabase
+            .from("chats")
+            .insert({
+              type: "buddy",
+              status: "permanent",
+              created_at: new Date().toISOString(),
+              last_message_at: new Date().toISOString(),
+            })
+            .select()
+            .single();
+
+          if (chatError) throw chatError;
+
+          chatId = newChat.id;
+
+          const { error: participantsError } = await supabase
+            .from("chat_participants")
+            .insert([
+              { chat_id: chatId, user_id: user.id },
+              { chat_id: chatId, user_id: buddyId },
+            ]);
+
+          if (participantsError) throw participantsError;
+        }
+
+        // 💬 Insert message
+        const { error: messageError } = await supabase
+          .from("messages")
           .insert({
-            type: "buddy",
-            status: "permanent",
+            chat_id: chatId,
+            sender_id: user.id,
+            content: messageText,
+            is_read: false,
             created_at: new Date().toISOString(),
+          });
+
+        if (messageError) throw messageError;
+
+        await supabase
+          .from("chats")
+          .update({
             last_message_at: new Date().toISOString(),
           })
-          .select()
-          .single();
-
-        if (chatError) throw chatError;
-
-        chatId = newChat.id;
-
-        const { error: participantsError } = await supabase
-          .from("chat_participants")
-          .insert([
-            { chat_id: chatId, user_id: user.id },
-            { chat_id: chatId, user_id: buddyId },
-          ]);
-
-        if (participantsError) throw participantsError;
+          .eq("id", chatId);
       }
 
-      // 💬 Insert message
-      const { error: messageError } = await supabase
-        .from("messages")
-        .insert({
-          chat_id: chatId,
-          sender_id: user.id,
-          content: messageText,
-          is_read: false,
-          created_at: new Date().toISOString(),
-        });
+      toast.success(
+        `Post shared with ${selected.size} buddy${selected.size > 1 ? "s" : ""}! 💬`
+      );
 
-      if (messageError) throw messageError;
-
-      await supabase
-        .from("chats")
-        .update({
-          last_message_at: new Date().toISOString(),
-        })
-        .eq("id", chatId);
+      onClose();
+    } catch (err: any) {
+      console.error("Error sharing post:", err);
+      toast.error("Failed to share post");
+    } finally {
+      setSending(false);
     }
-
-    toast.success(
-      `Post shared with ${selected.size} buddy${selected.size > 1 ? "s" : ""}! 💬`
-    );
-
-    onClose();
-  } catch (err: any) {
-    console.error("Error sharing post:", err);
-    toast.error("Failed to share post");
-  } finally {
-    setSending(false);
-  }
-};
+  };
 
 
   if (!isOpen) return null;
@@ -244,14 +244,14 @@ export function ShareModal({
     <>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 z-[100]"
+        className="fixed inset-0 z-[10000]"
         style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
         onClick={onClose}
       />
 
       {/* Bottom sheet */}
       <div
-        className="fixed z-[101] right-0 flex items-end justify-center"
+        className="fixed z-[10001] right-0 flex items-end justify-center"
         style={{ left: leftOffset, bottom: bottomOffset }}
         onClick={onClose}
       >

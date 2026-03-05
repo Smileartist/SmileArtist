@@ -1,90 +1,150 @@
 # Smile Artist
 
-## Project Vision
-Smile Artist is a platform designed to foster a supportive community where users can share their thoughts, feelings, and experiences. It aims to connect individuals with motivators, share positive content, and provide a safe space for expression and mutual support. The vision is to create a digital haven that promotes mental well-being and personal growth. A social media platform designed particularly for poets authors and writers
+<div align="center">
+  <img src="./public/favicon.ico" alt="Smile Artist Logo" width="120" />
+</div>
 
-## Features
+<div align="center">
+  <p><strong>A digital haven promoting mental well-being and personal growth, specifically designed for poets, authors, and writers.</strong></p>
+</div>
 
-*   **User Authentication & Profiles:** Secure login/signup, customizable user profiles with avatars, bios, and interests.
-*   **Post Creation & Interaction:** Users can create posts, like, comment, and share them. Support for various categories and tags.
-*   **Motivator System:** Designated users can be motivators, offering guidance and support through specialized content and interactions.
-*   **Real-time Chat (Buddy System):** A unique matchmaking queue connects users for temporary or permanent buddy chats based on roles (seeker/listener).
-*   **Notifications:** Real-time updates for likes, comments, follows, and chat requests.
-*   **Content Collections & Reading History:** Users can save posts to collections and track their reading history.
-*   **Follow System:** Users can follow other profiles to stay updated with their content.
-*   **Search & Trending:** Functionality to search for posts and users, and view trending content.
-*   **Responsive Design:** Optimized for both mobile and desktop experiences.
-*   **Internationalization (i18n):** Support for multiple languages to cater to a global audience.
-*   **Theme Customization:** Users can personalize their app theme.
+---
 
-## Technologies Used (Tech Stack)
+## 📖 Project Vision
 
-### Frontend
-*   **React:** A declarative, component-based JavaScript library for building user interfaces.
-*   **Vite:** A fast frontend build tool that provides an extremely quick development experience.
-*   **TypeScript:** A typed superset of JavaScript that compiles to plain JavaScript, enhancing code quality and maintainability.
-*   **Tailwind CSS:** A utility-first CSS framework for rapidly building custom designs.
-*   **Shadcn/ui:** A collection of re-usable components built with Radix UI and Tailwind CSS.
-*   **Radix UI:** An open-source component library for building high-quality, accessible design systems and web apps.
-*   **Lucide React:** A beautiful and consistent icon toolkit.
+**Smile Artist** is a robust platform intended to foster a supportive community where users—especially creative minds like poets and writers—can share their thoughts, feelings, and experiences. 
 
-### Backend & Database
-*   **Supabase:** An open-source Firebase alternative providing a PostgreSQL database, Authentication, instant APIs, and Realtime subscriptions.
-    *   **PostgreSQL:** Robust relational database.
-    *   **Supabase Client (`@supabase/supabase-js`):** Client library for interacting with Supabase services.
-*   **Hono:** A small, simple, and ultrafast web framework for the Edge.
+It aims to organically connect individuals with "motivators," share positive content, and provide a safe space for expression. At its core, the vision is to build a social media platform that diverges from traditional norms by focusing intensely on emotional support, mutual growth, and meaningful peer-to-peer matchmaking through the built-in "Buddy System".
 
-### Other Tools & Libraries
-*   **`react-hook-form`:** For flexible and extensible forms with easy validation.
-*   **`recharts`:** A composable charting library built on React components.
-*   **`sonner`:** An opinionated toast component for React.
-*   **`class-variance-authority`, `clsx`, `tailwind-merge`:** For managing CSS classes dynamically.
-*   **`next-themes`:** For managing themes in React applications.
-*   **`embla-carousel-react`:** A lightweight carousel library.
-*   **`react-day-picker`:** A flexible date picker component.
-*   **`input-otp`:** For one-time password input fields.
-*   **`react-resizable-panels`:** For resizable panel layouts.
-*   **`cmdk`:** A command menu component.
-*   **`vaul`:** A dialog component for React.
+---
 
-## Workflow
+## ✨ Core Features
 
-### Getting Started
-1.  **Clone the repository:**
-    ```bash
-    git clone https://github.com/Smileartist/SmileA.git
-    cd SmileA
-    ```
-2.  **Install dependencies:**
-    ```bash
-    npm install
-    ```
-3.  **Set up Supabase:**
-    *   Create a new project on [Supabase](https://supabase.com/).
-    *   Configure your database schema using the `DATABASE_SOURCE_OF_TRUTH.sql` file provided in the project root.
-    *   Obtain your Supabase Project URL and Anon Key.
-    *   Create a `.env` file in the project root and add your Supabase credentials:
-        ```
-        VITE_SUPABASE_URL=YOUR_SUPABASE_PROJECT_URL
-        VITE_SUPABASE_ANON_KEY=YOUR_SUPABASE_ANON_KEY
-        ```
-4.  **Run the development server:**
-    ```bash
-    npm run dev
-    ```
-    The application will be accessible at `http://localhost:5173` (or another port if 5173 is in use).
+*   **Secure Authentication & Profiles:** 
+    *   Powered by Supabase Auth (JWT).
+    *   Customizable user profiles featuring avatars, cover photos, rich bios, locations, and interest tags.
+*   **Rich Content Creation & Social Interaction:** 
+    *   Create detailed posts and poems.
+    *   Categorize content dynamically using tags and categories.
+    *   Engage via fully functional liking and commenting systems, along with nested comment likes.
+*   **AI-Powered Writing Companion (VerseVibe Integration):** ✨
+    *   **TalkingBuddy AI:** Integrated with **Google Gemini 2.5 Flash**, offering empathic, real-time sentiment analysis and constructive pacing/word-choice advice for poets.
+    *   **Sentiment-Reactive UI:** Beautiful, dynamic backgrounds powered by **Framer Motion** that instantly shift colors and animations to match the emotional tone of your writing.
+*   **Unique Motivator System:** 
+    *   Designated authoritative users can be "Motivators," complete with specialized titles and bios.
+    *   They offer guidance and support through specialized content.
+*   **Anonymous/Direct Real-time Chat (Buddy System):** 
+    *   A sophisticated matchmaking queue connecting users temporarily (24-hour expiry) or permanently.
+    *   Role-based queuing: users join as a "Seeker" or "Listener".
+    *   Real-time bidirectional messaging handled via Supabase Realtime and custom PostgreSQL RPCs.
+*   **Notifications Engine:** 
+    *   Real-time, in-app updates for likes, comments, follows, and buddy requests.
+*   **Content Curation & History:** 
+    *   **Collections:** Curate and save posts into colored, descriptive collections.
+    *   **Reading History:** Automatically track recently viewed poets and posts.
+*   **Follow Graph:** 
+    *   A relational follow system to curate timelines.
+*   **Theming & i18n:** 
+    *   Light/Dark mode support seamlessly blended with the AI Sentiment UI.
+    *   Internationalization structure for a global audience.
 
-### Project Structure (Key Directories)
-*   `src/components/`: Contains all reusable React components.
-*   `src/utils/`: Utility functions, helper modules, and API interaction logic.
-*   `src/supabase/`: Supabase-related configurations, functions, and database interactions.
-*   `src/styles/`: Global styles and Tailwind CSS configurations.
-*   `public/`: Static assets and service worker.
-*   `DATABASE_SOURCE_OF_TRUTH.sql`: The complete SQL schema for the Supabase database.
+---
 
-## Contributing
-We welcome contributions to Smile Artist! Please refer to our [Contribution Guidelines](link-to-contribution-guidelines) for more information on how to get started.
+## 🛠️ Technology Stack
 
-## License
-This project is licensed under the MIT License. See the `LICENSE` file for details.
+### Frontend Architecture
+*   **Framework:** [React 18](https://reactjs.org/) + [TypeScript](https://www.typescriptlang.org/)
+*   **Build Tool:** [Vite](https://vitejs.dev/) & SWC Plugin (Lightning-fast HMR)
+*   **Styling & UI Components:** [Tailwind CSS](https://tailwindcss.com/) & [Shadcn UI](https://ui.shadcn.com/)
+*   **Animations:** `framer-motion` (for reactive backgrounds & Floating Orbs)
+*   **Forms & Validation:** `react-hook-form`
+*   **Data Visualization:** `recharts` for insightful dashboards/metrics
+*   **Theme Management:** `next-themes`
 
+### Backend & AI Architecture
+*   **Local AI API Server:** Node.js + Express (serving the `/api/analyze` endpoint for VerseVibe)
+*   **AI Integration:** `@google/generative-ai` (Gemini 2.5 Flash)
+*   **BaaS Platform:** [Supabase](https://supabase.com/) (PostgreSQL Database)
+*   **Security:** Row Level Security (RLS) policies strictly enforced on tables (Users, Posts, Messages).
+*   **Logic:** Edge-native features leveraging PostgreSQL Stored Procedures (RPCs) to handle complex transactions atomically (like the Matchmaking Queue logic).
+
+---
+
+## 🗂️ Project Structure
+
+An overview of the essential directories in the repository:
+
+```text
+smileartist/
+├── src/
+│   ├── components/       # Reusable React & Shadcn UI components (Navbars, Cards, Modals)
+│   ├── styles/           # Global stylesheets and Tailwind entrypoints
+│   ├── supabase/         # Supabase client configurations and custom hooks
+│   ├── utils/            # Helper functions, formatters, and centralized API callers
+│   ├── App.tsx           # Main application routing and layout
+│   └── main.tsx          # React DOM entry point
+├── public/               # Static assets (favicons, manifest.json)
+├── supabase/             # Local Supabase configurations and edge functions
+├── DATABASE_SOURCE_OF_TRUTH.sql # Full PostgreSQL schema, RPCs, and RLS policies
+├── package.json          # Dependency definitions and scripts
+└── vite.config.ts        # Vite configuration and plugins
+```
+
+---
+
+## 🚀 Getting Started
+
+Follow these steps to set up the project locally.
+
+### 1. Clone the repository
+```bash
+git clone https://github.com/Smileartist/SmileA.git
+cd SmileA
+```
+
+### 2. Install Dependencies
+```bash
+npm install
+# or if using yarn: yarn install
+```
+
+### 3. Database & Backend Configuration (Supabase)
+To run this project, you need a connected Supabase project to handle the Auth, Database, and Realtime features.
+
+1. Create a new project on [Supabase.com](https://supabase.com/).
+2. Navigate to the SQL Editor in your Supabase Dashboard.
+3. Copy the entire contents of `DATABASE_SOURCE_OF_TRUTH.sql` from the root of this project and paste it into the SQL Editor, then click **Run**. This will create all necessary tables, constraints, RPCs, and RLS policies.
+4. Retrieve your **Project URL** and **Anon Key** from Project Settings > API.
+
+### 4. Environment Variables
+Create a `.env` file in the root directory and add the following keys obtained from your Supabase dashboard and Google AI Studio:
+
+```env
+VITE_SUPABASE_URL=your_supabase_project_url
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+GEMINI_API_KEY=your_gemini_2.5_flash_api_key
+```
+
+### 5. Run the Application
+Start the development server and the local AI backend via `concurrently`:
+
+```bash
+npm run dev
+```
+The frontend application will be accessible at [http://localhost:3000](http://localhost:3000) and the AI backend runs locally on port 8000.
+
+---
+
+## 🤝 Contributing
+
+We welcome contributions to make Smile Artist a safer and better place.
+1. Fork the repository.
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`).
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`).
+4. Push to the branch (`git push origin feature/AmazingFeature`).
+5. Open a Pull Request.
+
+---
+
+## 📄 License
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

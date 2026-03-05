@@ -216,14 +216,14 @@ export function CommentModal({ postId, isOpen, onClose, onCommentAdded }: Commen
     <>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 z-[100]"
+        className="fixed inset-0 z-[10000]"
         style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
         onClick={onClose}
       />
 
       {/* Bottom sheet */}
       <div
-        className="fixed z-[101] right-0 flex items-end justify-center"
+        className="fixed z-[10001] right-0 flex items-end justify-center"
         style={{ left: leftOffset, bottom: bottomOffset }}
         onClick={onClose}
       >

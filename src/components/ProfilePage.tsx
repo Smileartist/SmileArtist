@@ -150,6 +150,7 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
 
         const formattedPosts = (posts || []).map((post: any) => ({
           postId: post.id,
+          user_id: post.user_id,
           author: {
             full_name: profile?.full_name || profile?.username || "User",
             username: profile?.username || "user",
@@ -261,6 +262,11 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
     else if (data.from_user === currentUserId) setBuddyStatus('pending_sent');
     else setBuddyStatus('pending_received');
   };
+
+  useEffect(() => {
+    fetchBuddies();
+    checkBuddyStatus();
+  }, [userId, currentUserId]);
 
   // ensureUserExists is now imported from ../utils/ensureUserExists
 
@@ -753,7 +759,7 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
         <Tabs defaultValue="posts" className="w-full">
           <TabsList className="grid w-full grid-cols-3 mb-6 rounded-xl shadow-md" style={{ backgroundColor: 'var(--theme-accent)' }}>
             <TabsTrigger value="posts" className="rounded-xl"><BookOpen className="w-4 h-4 mr-2" />Posts</TabsTrigger>
-            <TabsTrigger value="saved" className="rounded-xl"><Users className="w-4 h-4 mr-2" />Buddies</TabsTrigger>
+            <TabsTrigger value="buddies" className="rounded-xl"><Users className="w-4 h-4 mr-2" />Buddies</TabsTrigger>
             <TabsTrigger value="about" className="rounded-xl"><Users className="w-4 h-4 mr-2" />About</TabsTrigger>
           </TabsList>
 
@@ -846,7 +852,7 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
             )}
           </TabsContent>
 
-          <TabsContent value="saved">
+          <TabsContent value="buddies">
             {buddiesList.length > 0 ? (
               <div className="space-y-3">
                 {/* Header row */}
@@ -992,7 +998,13 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
             </button>
 
             <div style={{ padding: '8px' }}>
-              <PostCard post={selectedPost} />
+              <PostCard
+                post={selectedPost}
+                onDelete={(deletedId) => {
+                  setUserPosts(prev => prev.filter(p => p.postId !== deletedId));
+                  setSelectedPost(null);
+                }}
+              />
             </div>
           </div>
         </div>,

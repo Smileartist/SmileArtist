@@ -1,29 +1,60 @@
 import express from "express";
 import cors from "cors";
 import bodyParser from "body-parser";
-import OpenAI from "openai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
+import dotenv from "dotenv";
+
+// Load environment variables from .env file
+dotenv.config();
 
 const app = express();
 app.use(cors());
 app.use(bodyParser.json());
 
-const client = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+// Initialize Gemini
+const genAI = process.env.GEMINI_API_KEY
+  ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
+  : null;
+
+app.get("/health", (req, res) => {
+  res.json({ status: "ok", message: "VerseVibe backend is running!" });
 });
 
-app.post("/api/chat", async (req, res) => {
+app.post("/api/analyze", async (req, res) => {
+  if (!genAI) {
+    return res.status(503).json({ error: "GEMINI_API_KEY is missing. Add it to .env" });
+  }
+
   try {
-    const { messages } = req.body;
+    const { content } = req.body;
 
-    const completion = await client.chat.completions.create({
-      model: "gpt-4.1-mini",
-      messages,
-    });
+    if (!content || !content.trim()) {
+      return res.status(400).json({ error: "No content provided" });
+    }
 
-    res.json({ reply: completion.choices[0].message });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+
+    const prompt = `
+    You are 'TalkingBuddy', a supportive and insightful AI companion for poets and creative writers.
+    Analyze this text: "${content}"
+
+    IMPORTANT: Respond ONLY with a valid JSON object. No markdown, no code fences, no extra text.
+    {
+        "sentiment": "One word (choose from: Melancholic, Joyful, Dark, Energetic, Peaceful, Thoughtful, Romantic, Mysterious)",
+        "suggestions": "Two warm, encouraging sentences of constructive feedback",
+        "pacing": "One sentence about the rhythm and flow of the piece",
+        "wordChoice": "One sentence about the vocabulary and imagery used",
+        "tone": "One sentence describing the overall emotional tone"
+    }
+    `;
+
+    const result = await model.generateContent(prompt);
+    const text = result.response.text();
+
+    res.json({ analysis: text });
   } catch (e) {
-    console.error(e);
-    res.status(500).json({ error: "AI response failed" });
+    console.error("Analysis error:", e);
+    res.status(500).json({ error: e.message || "Analysis failed. Please try again." });
   }
 });
 

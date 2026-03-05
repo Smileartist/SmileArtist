@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Heart, MessageCircle, Bookmark, MoreHorizontal, Send, Link2, Flag, User, Share2 } from "lucide-react";
+import { Heart, MessageCircle, Bookmark, MoreHorizontal, Send, Link2, Flag, User, Share2, Trash2 } from "lucide-react";
 import { Card } from "./ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import {
@@ -19,11 +19,12 @@ import { toast } from "sonner";
 
 interface PostCardProps {
   post: Post;
+  onDelete?: (postId: string) => void;
 }
 
-export function PostCard({ post }: PostCardProps) {
+export function PostCard({ post, onDelete }: PostCardProps) {
   const { onViewChange, userId: currentUserId } = useUserData();
-  const { postId, author, content, title, likes, comments: initialComments, created_at: timestamp, category } = post;
+  const { postId, author, content, title, likes, comments: initialComments, created_at: timestamp, category, user_id } = post;
 
   // 🔥 FIX: do NOT trust posts.likes anymore
   const [likeCount, setLikeCount] = useState(0);
@@ -152,6 +153,27 @@ export function PostCard({ post }: PostCardProps) {
     toast.success("Post reported. Thank you for keeping the community safe. 🙏");
   };
 
+  const handleDeletePost = async () => {
+    if (!window.confirm("Are you sure you want to delete this post? This action cannot be undone.")) return;
+
+    try {
+      const { error } = await supabase.from('posts').delete().eq('id', postId);
+      if (error) throw error;
+
+      toast.success("Post deleted successfully.");
+
+      if (onDelete) {
+        onDelete(postId);
+      } else {
+        // Fallback for components that don't yet pass onDelete
+        window.location.reload();
+      }
+    } catch (e: any) {
+      console.error("Error deleting post:", e);
+      toast.error(e.message || "Failed to delete post.");
+    }
+  };
+
   return (
     <Card className="p-4 md:p-6">
       <div className="flex items-start justify-between mb-4">
@@ -182,7 +204,16 @@ export function PostCard({ post }: PostCardProps) {
               <MoreHorizontal className="w-5 h-5" />
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-44">
+          <DropdownMenuContent align="end" className="w-44" style={{ zIndex: 10000 }}>
+            {user_id === currentUserId && (
+              <>
+                <DropdownMenuItem onClick={handleDeletePost} className="text-red-500 font-medium focus:text-red-500">
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Delete Post
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+              </>
+            )}
             <DropdownMenuItem onClick={handleAuthorClick}>
               <User className="w-4 h-4 mr-2" />
               View Profile
