@@ -227,6 +227,7 @@ create table chats (
   last_message_at timestamptz default now(),
   type text default 'normal',
   status text default 'temporary',
+  is_anonymous boolean default false,
   expires_at timestamptz default (now() + interval '24 hours')
 );
 
@@ -472,11 +473,11 @@ foreign key (chat_id) references chats(id) on delete cascade;
 
 alter table buddy_requests
 add constraint fk_buddy_requests_from
-foreign key (from_user) references profiles(id);
+foreign key (from_user) references profiles(id) on delete cascade;
 
 alter table buddy_requests
 add constraint fk_buddy_requests_to
-foreign key (to_user) references profiles(id);
+foreign key (to_user) references profiles(id) on delete cascade;
 
 
 -- ========================
@@ -496,3 +497,144 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 -- (Run this if the posts table already exists)
 -- ========================
 -- ALTER TABLE posts ADD COLUMN IF NOT EXISTS type text DEFAULT 'poem';
+
+
+-- ========================
+-- GET OR CREATE BUDDY CHAT
+-- (Finds existing chat between two users, or creates a new one. 
+-- Upgrades message_request chats to buddy chats if found.)
+-- ========================
+CREATE OR REPLACE FUNCTION get_or_create_buddy_chat(p_user_id uuid, p_buddy_id uuid)
+RETURNS uuid AS $$
+DECLARE
+  v_chat_id uuid;
+BEGIN
+  -- Look for ANY chat between these two.
+  -- ORDER BY:
+  -- 1. Most recent activity (last_message_at DESC NULLS LAST)
+  -- 2. Number of messages
+  -- 3. Status 'permanent' or 'active' (Prefer settled chats)
+  -- 4. Type 'buddy'
+  -- 5. Most recent creation
+  SELECT c.id INTO v_chat_id
+  FROM chats c
+  JOIN chat_participants cp1 ON c.id = cp1.chat_id
+  JOIN chat_participants cp2 ON c.id = cp2.chat_id
+  WHERE cp1.user_id = p_user_id
+    AND cp2.user_id = p_buddy_id
+  ORDER BY 
+    c.last_message_at DESC NULLS LAST,
+    (SELECT count(*) FROM messages m WHERE m.chat_id = c.id) DESC,
+    (c.status IN ('permanent', 'active')) DESC,
+    (c.type = 'buddy') DESC,
+    c.created_at DESC
+  LIMIT 1;
+
+  IF v_chat_id IS NULL THEN
+    -- Create new permanent buddy chat
+    INSERT INTO chats (type, status, last_message_at, is_anonymous)
+    VALUES ('buddy', 'permanent', now(), false)
+    RETURNING id INTO v_chat_id;
+
+    -- Add both participants
+    INSERT INTO chat_participants (chat_id, user_id)
+    VALUES (v_chat_id, p_user_id), (v_chat_id, p_buddy_id);
+  ELSE
+    -- If it's a message_request or temporary, upgrade it to buddy
+    UPDATE chats 
+    SET type = 'buddy', status = 'permanent', is_anonymous = false 
+    WHERE id = v_chat_id 
+    AND (type = 'message_request' OR status = 'temporary' OR is_anonymous = true);
+  END IF;
+
+  RETURN v_chat_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+
+-- ========================
+-- GET OR CREATE MESSAGE REQUEST CHAT
+-- (Finds existing chat or creates a new one marked as 'message_request')
+-- ========================
+CREATE OR REPLACE FUNCTION get_or_create_message_request_chat(p_user_id uuid, p_target_id uuid)
+RETURNS uuid AS $$
+DECLARE
+  v_chat_id uuid;
+BEGIN
+  -- Look for ANY chat between these two
+  -- ORDER BY:
+  -- 1. Most recent activity
+  -- 2. Number of messages
+  -- 3. Status 'permanent' or 'active'
+  -- 4. Most recent creation
+  SELECT c.id INTO v_chat_id
+  FROM chats c
+  JOIN chat_participants cp1 ON c.id = cp1.chat_id
+  JOIN chat_participants cp2 ON c.id = cp2.chat_id
+  WHERE cp1.user_id = p_user_id
+    AND cp2.user_id = p_target_id
+  ORDER BY 
+    c.last_message_at DESC NULLS LAST,
+    (SELECT count(*) FROM messages m WHERE m.chat_id = c.id) DESC,
+    (c.status IN ('permanent', 'active')) DESC,
+    c.created_at DESC
+  LIMIT 1;
+
+  IF v_chat_id IS NOT NULL THEN
+    RETURN v_chat_id;
+  END IF;
+
+  -- Create new message request chat
+  INSERT INTO chats (type, status, last_message_at)
+  VALUES ('message_request', 'temporary', now())
+  RETURNING id INTO v_chat_id;
+
+  -- Add both participants
+  INSERT INTO chat_participants (chat_id, user_id)
+  VALUES (v_chat_id, p_user_id), (v_chat_id, p_target_id);
+
+  RETURN v_chat_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+
+
+-- ========================
+-- HELPER FUNCTION FOR CHAT RLS
+-- (Bypasses RLS to avoid infinite recursion when policies query themselves)
+-- ========================
+CREATE OR REPLACE FUNCTION is_chat_participant(check_chat_id uuid)
+RETURNS boolean AS $$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1 FROM chat_participants 
+    WHERE chat_id = check_chat_id AND user_id = auth.uid()
+  );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+
+-- ========================
+-- RLS POLICIES FOR CHATS
+-- (Allow participants to view/update their own chats)
+-- ========================
+ALTER TABLE chats ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "chat participants can view chats" ON chats
+  FOR SELECT TO authenticated
+  USING (is_chat_participant(id));
+
+CREATE POLICY "chat participants can update chats" ON chats
+  FOR UPDATE TO authenticated
+  USING (is_chat_participant(id));
+
+
+-- ========================
+-- RLS POLICIES FOR CHAT_PARTICIPANTS
+-- (Allow participants to view participants of their chats)
+-- ========================
+ALTER TABLE chat_participants ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "users can view their chat participants" ON chat_participants
+  FOR SELECT TO authenticated
+  USING (is_chat_participant(chat_id));

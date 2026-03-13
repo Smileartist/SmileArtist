@@ -35,7 +35,7 @@ app.post("/api/analyze", async (req, res) => {
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
     const prompt = `
-    You are 'TalkingBuddy', a supportive and insightful AI companion for poets and creative writers.
+    You are 'VerseVibe', a supportive and insightful AI companion for poets and creative writers.
     Analyze this text: "${content}"
 
     IMPORTANT: Respond ONLY with a valid JSON object. No markdown, no code fences, no extra text.

@@ -9,15 +9,15 @@ import { useTheme } from "../utils/ThemeContext";
 import { supabase } from "../utils/supabaseClient";
 
 // ✅ FIXED IMPORT: Now pointing to the correct file name
-import { 
-  findBuddyMatch, 
+import {
+  findBuddyMatch,
   sendBuddyMessage,
   sendBuddyMessageRpc,
   getBuddyMessages,
-  sendBuddyRequest, 
-  acceptBuddyRequest, 
-  cancelMatchmaking 
-} from "../utils/supabaseQueries"; 
+  sendBuddyRequest,
+  acceptBuddyRequest,
+  cancelMatchmaking
+} from "../utils/supabaseQueries";
 
 type UserRole = "listener" | "seeker" | null;
 type ConnectionStatus = "idle" | "waiting" | "connected" | "ended";
@@ -43,10 +43,10 @@ export function TalkingBuddy() {
   const [friendRequestSent, setFriendRequestSent] = useState(false);
   const [friendRequestReceived, setFriendRequestReceived] = useState(false);
   const [friendsAdded, setFriendsAdded] = useState(false);
-  
+
   const [userId, setUserId] = useState<string | null>(null);
   const [otherUserId, setOtherUserId] = useState<string | null>(null);
-  
+
   // channel ready flag so we only send broadcast when SUBSCRIBED
   const [channelReady, setChannelReady] = useState(false);
 
@@ -288,46 +288,46 @@ export function TalkingBuddy() {
   // `resolvedRole` is passed explicitly to avoid stale closure when called from
   // startConnection() where React state (role) hasn't updated yet.
   const handleMatchFound = async (chatId: string, resolvedRole?: UserRole) => {
-      const effectiveRole = resolvedRole ?? role;
-      console.log(`[TalkingBuddy] handleMatchFound — chatId: ${chatId}, role: ${effectiveRole}`);
+    const effectiveRole = resolvedRole ?? role;
+    console.log(`[TalkingBuddy] handleMatchFound — chatId: ${chatId}, role: ${effectiveRole}`);
 
-      // Connect right away so the user isn't stuck on the waiting screen
-      setSessionId(chatId);
-      setStatus("connected");
+    // Connect right away so the user isn't stuck on the waiting screen
+    setSessionId(chatId);
+    setStatus("connected");
 
-      // Cleanup Queue (Best effort - may already be removed by RPC)
-      if (userId) {
-          try { await cancelMatchmaking(userId); } catch(e) { /* ignore if already gone */ }
+    // Cleanup Queue (Best effort - may already be removed by RPC)
+    if (userId) {
+      try { await cancelMatchmaking(userId); } catch (e) { /* ignore if already gone */ }
+    }
+
+    // Try to pre-fetch the OTHER participant's ID.
+    // This may fail if Supabase RLS only allows users to see their own row in
+    // chat_participants. If it fails, otherUserId will be discovered lazily from
+    // the first incoming message (see the message listener below).
+    try {
+      const { data: participants } = await supabase
+        .from('chat_participants')
+        .select('user_id')
+        .eq('chat_id', chatId)
+        .neq('user_id', userId);
+
+      if (participants && participants.length > 0) {
+        setOtherUserId(participants[0].user_id);
       }
+    } catch (e) {
+      console.log("Could not pre-fetch partner ID; will detect from first message.");
+    }
 
-      // Try to pre-fetch the OTHER participant's ID.
-      // This may fail if Supabase RLS only allows users to see their own row in
-      // chat_participants. If it fails, otherUserId will be discovered lazily from
-      // the first incoming message (see the message listener below).
-      try {
-          const { data: participants } = await supabase
-            .from('chat_participants')
-            .select('user_id')
-            .eq('chat_id', chatId)
-            .neq('user_id', userId);
-
-          if (participants && participants.length > 0) {
-              setOtherUserId(participants[0].user_id);
-          }
-      } catch (e) {
-          console.log("Could not pre-fetch partner ID; will detect from first message.");
-      }
-
-      // System Welcome Message — use effectiveRole to avoid stale-closure wrong message
-      setMessages([{
-        id: `welcome_${Date.now()}`,
-        text: effectiveRole === "seeker"
-            ? "You are now connected with a Listener. This is a safe space."
-            : "You are now connected with a Seeker. Please listen with empathy.",
-        sender: "other",
-        senderId: "system",
-        timestamp: Date.now(),
-      }]);
+    // System Welcome Message — use effectiveRole to avoid stale-closure wrong message
+    setMessages([{
+      id: `welcome_${Date.now()}`,
+      text: effectiveRole === "seeker"
+        ? "You are now connected with a Listener. This is a safe space."
+        : "You are now connected with a Seeker. Please listen with empathy.",
+      sender: "other",
+      senderId: "system",
+      timestamp: Date.now(),
+    }]);
   };
 
   // ACTION: Start Queue
@@ -345,26 +345,26 @@ export function TalkingBuddy() {
     setFriendRequestReceived(false);
 
     try {
-        // 1. Try to find an immediate match using your RPC query
-        const matchId = await findBuddyMatch(userId, selectedRole);
-        
-        // 2. If the RPC returns a chat_id immediately
-        if (matchId) {
-            // Pass selectedRole explicitly — React state (role) may not be updated yet
-            await handleMatchFound(matchId, selectedRole);
-        } else {
-            // 3. If no immediate match, insert into queue and wait
-            const { error: queueError } = await supabase
-                .from("matchmaking_queue")
-                .upsert({ user_id: userId, role: selectedRole });
+      // 1. Try to find an immediate match using your RPC query
+      const matchId = await findBuddyMatch(userId, selectedRole);
 
-            if (queueError) throw queueError;
-        }
+      // 2. If the RPC returns a chat_id immediately
+      if (matchId) {
+        // Pass selectedRole explicitly — React state (role) may not be updated yet
+        await handleMatchFound(matchId, selectedRole);
+      } else {
+        // 3. If no immediate match, insert into queue and wait
+        const { error: queueError } = await supabase
+          .from("matchmaking_queue")
+          .upsert({ user_id: userId, role: selectedRole });
+
+        if (queueError) throw queueError;
+      }
 
     } catch (err: any) {
-        console.error("Queue Error:", err);
-        setError("Failed to join waiting room.");
-        setStatus("idle");
+      console.error("Queue Error:", err);
+      setError("Failed to join waiting room.");
+      setStatus("idle");
     }
   };
 
@@ -448,6 +448,8 @@ export function TalkingBuddy() {
     if (otherUserId) {
       try {
         await acceptBuddyRequest(sessionId, userId, otherUserId);
+        // Promote the chat from temporary to permanent so it appears in the permanent DM list
+        await supabase.from('chats').update({ status: 'permanent', is_anonymous: false }).eq('id', sessionId);
       } catch (err) {
         console.error("DB accept_buddy persist failed");
       }
@@ -480,33 +482,33 @@ export function TalkingBuddy() {
   // ACTION: End Connection
   const endConnection = async () => {
     if (status === "waiting" && userId) {
-        try {
-            await cancelMatchmaking(userId);
-        } catch (e) { console.error(e); }
-        
-        setStatus("idle");
-        setRole(null);
+      try {
+        await cancelMatchmaking(userId);
+      } catch (e) { console.error(e); }
+
+      setStatus("idle");
+      setRole(null);
     } else if (status === "connected") {
-        // Soft end: allow user to stay on screen to add friend
-        setStatus("ended");
-        setMessages(prev => [...prev, { 
-            id: 'sys_end', 
-            text: "Chat ended. You can now send a connection request or exit.", 
-            sender: 'other', 
-            senderId: 'system', 
-            timestamp: Date.now() 
-        }]);
+      // Soft end: allow user to stay on screen to add friend
+      setStatus("ended");
+      setMessages(prev => [...prev, {
+        id: 'sys_end',
+        text: "Chat ended. You can now send a connection request or exit.",
+        sender: 'other',
+        senderId: 'system',
+        timestamp: Date.now()
+      }]);
     } else {
-        // Hard Reset
-        setStatus("idle");
-        setRole(null);
-        setSessionId(null);
-        setMessages([]);
-        setInputMessage("");
-        setFriendRequestSent(false);
-        setFriendRequestReceived(false);
-        setFriendsAdded(false);
-        setOtherUserId(null);
+      // Hard Reset
+      setStatus("idle");
+      setRole(null);
+      setSessionId(null);
+      setMessages([]);
+      setInputMessage("");
+      setFriendRequestSent(false);
+      setFriendRequestReceived(false);
+      setFriendsAdded(false);
+      setOtherUserId(null);
     }
   };
 
@@ -593,29 +595,29 @@ export function TalkingBuddy() {
 
   // WAITING STATE
   if (status === "waiting") {
-      return (
-        <div className="max-w-4xl mx-auto flex items-center justify-center h-[50vh]">
-            <Card className="p-8 text-center border-none shadow-none bg-transparent">
-                <Loader2 className="w-12 h-12 animate-spin mx-auto mb-4" style={{ color: 'var(--theme-primary)' }} />
-                <h3 className="text-xl font-medium mb-2" style={{ color: 'var(--theme-text)' }}>
-                    Finding a {role === 'listener' ? 'Seeker' : 'Listener'}...
-                </h3>
-                <p className="text-sm mb-6" style={{ color: 'var(--theme-text)', opacity: 0.7 }}>
-                    Please wait while we pair you with someone.
-                </p>
-                <Button onClick={() => endConnection()} variant="outline">
-                    Cancel
-                </Button>
-            </Card>
-        </div>
-      );
+    return (
+      <div className="max-w-4xl mx-auto flex items-center justify-center h-[50vh]">
+        <Card className="p-8 text-center border-none shadow-none bg-transparent">
+          <Loader2 className="w-12 h-12 animate-spin mx-auto mb-4" style={{ color: 'var(--theme-primary)' }} />
+          <h3 className="text-xl font-medium mb-2" style={{ color: 'var(--theme-text)' }}>
+            Finding a {role === 'listener' ? 'Seeker' : 'Listener'}...
+          </h3>
+          <p className="text-sm mb-6" style={{ color: 'var(--theme-text)', opacity: 0.7 }}>
+            Please wait while we pair you with someone.
+          </p>
+          <Button onClick={() => endConnection()} variant="outline">
+            Cancel
+          </Button>
+        </Card>
+      </div>
+    );
   }
 
   // ACTIVE CHAT / ENDED STATE
   return (
     <div className="max-w-4xl mx-auto md:pt-0 -mt-16 md:mt-0 -mx-4 md:mx-auto h-screen md:h-auto">
       <Card className="border backdrop-blur-sm md:rounded-2xl shadow-lg overflow-hidden h-full md:h-auto flex flex-col" style={{ borderColor: 'var(--theme-primary)', backgroundColor: 'var(--theme-card-bg)', opacity: 1 }}>
-        
+
         {/* Header */}
         <div className="border-b p-3 md:p-4 flex items-center justify-between flex-shrink-0" style={{ borderColor: 'var(--theme-primary)', background: 'var(--theme-accent)' }}>
           <div className="flex items-center gap-2 md:gap-3">
@@ -642,21 +644,21 @@ export function TalkingBuddy() {
               <p className="text-sm md:text-base" style={{ color: 'var(--theme-text)', opacity: 0.7 }}>Start the conversation...</p>
             </div>
           )}
-          
+
           {messages.map((message) => {
             const isMe = message.sender === "me";
             const isSystem = message.senderId === "system";
             const bubbleRadius = theme.chatBubbleStyle === "square" ? "0.25rem" : theme.chatBubbleStyle === "bubble" ? "1.5rem" : theme.borderRadius;
             const bubbleClass = theme.chatBubbleStyle === "bubble" ? (isMe ? "rounded-2xl rounded-br-sm" : "rounded-2xl rounded-bl-sm") : "";
-            
+
             if (isSystem) {
-                return (
-                    <div key={message.id} className="flex justify-center my-2">
-                        <span className="text-xs py-1 px-3 rounded-full bg-[var(--theme-accent)] text-[var(--theme-text)] opacity-70">
-                            {message.text}
-                        </span>
-                    </div>
-                )
+              return (
+                <div key={message.id} className="flex justify-center my-2">
+                  <span className="text-xs py-1 px-3 rounded-full bg-[var(--theme-accent)] text-[var(--theme-text)] opacity-70">
+                    {message.text}
+                  </span>
+                </div>
+              )
             }
 
             return (
@@ -699,14 +701,14 @@ export function TalkingBuddy() {
         {/* Request Trigger Button */}
         {!friendsAdded && !friendRequestSent && (
           <div className="px-4 pb-3">
-            <Button 
-                onClick={sendFriendReq} 
-                variant="outline" 
-                size="sm" 
-                className="w-full rounded-xl hover:bg-[var(--theme-accent)]" 
-                style={{ borderColor: 'var(--theme-primary)', color: 'var(--theme-primary)', backgroundColor: 'transparent' }} 
+            <Button
+              onClick={sendFriendReq}
+              variant="outline"
+              size="sm"
+              className="w-full rounded-xl hover:bg-[var(--theme-accent)]"
+              style={{ borderColor: 'var(--theme-primary)', color: 'var(--theme-primary)', backgroundColor: 'transparent' }}
             >
-              <UserPlus className="w-4 h-4 mr-2" /> 
+              <UserPlus className="w-4 h-4 mr-2" />
               {status === 'ended' ? "Save Chat & Add Buddy" : "Save Chat & Stay Connected"}
             </Button>
           </div>
@@ -715,21 +717,21 @@ export function TalkingBuddy() {
         {/* Input Area */}
         <div className="border-t p-3 md:p-4 flex-shrink-0" style={{ borderColor: 'var(--theme-primary)', backgroundColor: 'var(--theme-accent)' }}>
           <div className="flex gap-2">
-            <Input 
-                type="text" 
-                placeholder={status === 'ended' ? "Chat ended." : "Type your message..."} 
-                value={inputMessage} 
-                disabled={status === 'ended'}
-                onChange={(e) => setInputMessage(e.target.value)} 
-                onKeyDown={(e) => e.key === "Enter" && sendMessage()}
-                className="flex-1 text-sm md:text-base rounded-xl" 
-                style={{ borderColor: 'var(--theme-primary)', backgroundColor: 'var(--theme-card-bg)', color: 'var(--theme-text)' }} 
+            <Input
+              type="text"
+              placeholder={status === 'ended' ? "Chat ended." : "Type your message..."}
+              value={inputMessage}
+              disabled={status === 'ended'}
+              onChange={(e) => setInputMessage(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && sendMessage()}
+              className="flex-1 text-sm md:text-base rounded-xl"
+              style={{ borderColor: 'var(--theme-primary)', backgroundColor: 'var(--theme-card-bg)', color: 'var(--theme-text)' }}
             />
-            <Button 
-                onClick={sendMessage} 
-                disabled={status === 'ended'}
-                className="h-9 w-9 md:h-10 md:w-10 rounded-xl shadow-md" 
-                style={{ background: `linear-gradient(to right, var(--theme-primary), var(--theme-secondary))`, color: 'white' }}>
+            <Button
+              onClick={sendMessage}
+              disabled={status === 'ended'}
+              className="h-9 w-9 md:h-10 md:w-10 rounded-xl shadow-md"
+              style={{ background: `linear-gradient(to right, var(--theme-primary), var(--theme-secondary))`, color: 'white' }}>
               <Send className="w-4 h-4" />
             </Button>
           </div>

@@ -6,7 +6,7 @@ import { MobileHeader } from "./components/MobileHeader";
 import { HomePage } from "./components/HomePage";
 import { SearchPanel } from "./components/SearchPanel";
 import { TalkingBuddy } from "./components/TalkingBuddy";
-import { ChatList } from "./components/ChatList";
+import { ChatsPage } from "./components/ChatsPage";
 import { ThemeCustomizer } from "./components/ThemeCustomizer";
 import { ProfilePage } from "./components/ProfilePage";
 import { NotificationPage } from "./components/NotificationPage";
@@ -123,14 +123,64 @@ function AppContent() {
     }
   };
 
-  // Updated onViewChange to accept an optional userId
-  const handleViewChange = (view: string, targetUserId: string | null = null) => {
+  const [activeChatId, setActiveChatId] = useState<string | null>(null);
+
+  // Synchronize state with URL on mount and popstate
+  useEffect(() => {
+    const syncFromUrl = () => {
+      // Don't sync URL until the user is actually initialized, unless it's just the login screen
+      // But we can set the view intent.
+      const params = new URLSearchParams(window.location.search);
+      const view = params.get('view') || 'home';
+      const targetId = params.get('targetId');
+
+      if (view === 'profile') {
+        setSelectedProfileId(targetId);
+        setActiveChatId(null);
+      } else if (view === 'chats') {
+        setActiveChatId(targetId);
+        setSelectedProfileId(null);
+      } else {
+        setSelectedProfileId(null);
+        setActiveChatId(null);
+      }
+      setActiveView(view);
+    };
+
+    // Run once on mount to grab initial URL state
+    syncFromUrl();
+
+    // Listen for browser back/forward buttons
+    window.addEventListener('popstate', syncFromUrl);
+    return () => window.removeEventListener('popstate', syncFromUrl);
+  }, []);
+
+  // Updated onViewChange to accept an optional targetUserId or targetChatId
+  const handleViewChange = (view: string, targetId: string | null = null) => {
     if (view === "profile") {
-      setSelectedProfileId(targetUserId);
+      setSelectedProfileId(targetId);
+      setActiveChatId(null);
+    } else if (view === "chats") {
+      setActiveChatId(targetId);
+      setSelectedProfileId(null);
     } else {
       setSelectedProfileId(null); // Clear selected user when navigating away from profile
+      setActiveChatId(null);
     }
     setActiveView(view);
+
+    // Sync to URL
+    const url = new URL(window.location.href);
+    url.searchParams.set('view', view);
+    if (targetId) {
+      url.searchParams.set('targetId', targetId);
+    } else {
+      url.searchParams.delete('targetId');
+    }
+    // Only push state if the URL actually changed to prevent duplicate history entries
+    if (window.location.search !== url.search) {
+      window.history.pushState({ view, targetId }, '', url.toString());
+    }
   };
 
   // ── Realtime push notifications ────────────────────────────────
@@ -197,7 +247,7 @@ function AppContent() {
       case "buddy":
         return <TalkingBuddy />;
       case "chats":
-        return <ChatList />;
+        return <ChatsPage activeChatId={activeChatId} onViewChange={handleViewChange} />;
       case "write":
         return <WritePost />;
       case "customize":

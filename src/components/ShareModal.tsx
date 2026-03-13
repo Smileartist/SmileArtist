@@ -150,78 +150,22 @@ export function ShareModal({
     try {
       for (const buddyId of selected) {
 
-        // 🔍 Check if chat already exists via participants
-        const { data: myChats, error: chatsError } = await supabase
-          .from("chat_participants")
-          .select("chat_id")
-          .eq("user_id", user.id);
+        // 🔍 Get or create buddy chat via RPC (bypasses RLS)
+        const { data: chatId, error: chatError } = await supabase.rpc(
+          "get_or_create_buddy_chat",
+          { p_user_id: user.id, p_buddy_id: buddyId }
+        );
 
-        if (chatsError) throw chatsError;
+        if (chatError || !chatId) throw chatError || new Error("No chat ID returned");
 
-        let chatId: string | null = null;
-
-        if (myChats && myChats.length > 0) {
-          for (const chat of myChats) {
-            const { data: participants } = await supabase
-              .from("chat_participants")
-              .select("user_id")
-              .eq("chat_id", chat.chat_id);
-
-            const ids = participants?.map(p => p.user_id) || [];
-
-            if (ids.includes(buddyId) && ids.includes(user.id)) {
-              chatId = chat.chat_id;
-              break;
-            }
-          }
-        }
-
-        // ➕ Create new chat if none exists (UUID auto-generated)
-        if (!chatId) {
-          const { data: newChat, error: chatError } = await supabase
-            .from("chats")
-            .insert({
-              type: "buddy",
-              status: "permanent",
-              created_at: new Date().toISOString(),
-              last_message_at: new Date().toISOString(),
-            })
-            .select()
-            .single();
-
-          if (chatError) throw chatError;
-
-          chatId = newChat.id;
-
-          const { error: participantsError } = await supabase
-            .from("chat_participants")
-            .insert([
-              { chat_id: chatId, user_id: user.id },
-              { chat_id: chatId, user_id: buddyId },
-            ]);
-
-          if (participantsError) throw participantsError;
-        }
-
-        // 💬 Insert message
-        const { error: messageError } = await supabase
-          .from("messages")
-          .insert({
-            chat_id: chatId,
-            sender_id: user.id,
-            content: messageText,
-            is_read: false,
-            created_at: new Date().toISOString(),
-          });
+        // 💬 Insert message via RPC (bypasses RLS on messages table)
+        const { error: messageError } = await supabase.rpc("send_buddy_message", {
+          p_chat_id: chatId,
+          p_user_id: user.id,
+          p_content: messageText,
+        });
 
         if (messageError) throw messageError;
-
-        await supabase
-          .from("chats")
-          .update({
-            last_message_at: new Date().toISOString(),
-          })
-          .eq("id", chatId);
       }
 
       toast.success(

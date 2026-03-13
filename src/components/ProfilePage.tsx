@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { useUserData } from "../App";
-import { MapPin, Calendar, Edit2, Users, BookOpen, Award, Save, X, Image as ImageIcon, Trash2, Camera, Upload, UserPlus, UserCheck, Clock, Share2 } from "lucide-react";
+import { MapPin, Calendar, Edit2, Users, BookOpen, Award, Save, X, Image as ImageIcon, Trash2, Camera, Upload, UserPlus, UserCheck, Clock, Share2, Smile } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "./ui/tabs";
 import { Button } from "./ui/button";
 import { PostCard } from "./PostCard";
@@ -30,6 +30,9 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
   const [followerCount, setFollowerCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
   const [followLoading, setFollowLoading] = useState(false);
+  
+  // Follower list for the Followers tab
+  const [followersList, setFollowersList] = useState<any[]>([]);
 
   // Edit form state
   const [editFullName, setEditFullName] = useState("");
@@ -46,26 +49,48 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
   const [editMotivatorBio, setEditMotivatorBio] = useState("");
 
   const fetchFollowData = async (currId: string | null) => {
-    if (!userId) return;
+    if (!targetUuid) return;
     const { count: followers } = await supabase
       .from("follows")
       .select("*", { count: "exact", head: true })
-      .eq("following_id", userId);
+      .eq("following_id", targetUuid);
     setFollowerCount(followers ?? 0);
 
     // Fetch following count - how many people this user follows
     const { count: following } = await supabase
       .from("follows")
       .select("*", { count: "exact", head: true })
-      .eq("follower_id", userId);
+      .eq("follower_id", targetUuid);
     setFollowingCount(following ?? 0);
 
-    if (currId && currId !== userId) {
+    // Fetch the actual followers list for the tab
+    const { data: followersData } = await supabase
+      .from("follows")
+      .select("follower_id")
+      .eq("following_id", targetUuid);
+      
+    if (followersData && followersData.length > 0) {
+      const followerIds = followersData.map(f => f.follower_id);
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("id, full_name, username, avatar_url")
+        .in("id", followerIds);
+      setFollowersList(profiles || []);
+    } else {
+      setFollowersList([]);
+    }
+
+    if (!currId || currId === targetUuid) {
+      setIsFollowing(false);
+      return;
+    }
+    
+    if (currId && currId !== targetUuid) {
       const { data } = await supabase
         .from("follows")
         .select("follower_id")
         .eq("follower_id", currId)
-        .eq("following_id", userId)
+        .eq("following_id", targetUuid)
         .maybeSingle();
       setIsFollowing(!!data);
     }
@@ -78,22 +103,22 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
       if (isFollowing) {
         await supabase.from("follows").delete()
           .eq("follower_id", currentUserId)
-          .eq("following_id", userId);
+          .eq("following_id", targetUuid);
         setIsFollowing(false);
         setFollowerCount(c => Math.max(0, c - 1));
         toast.success("Unfollowed");
       } else {
         await supabase.from("follows").insert({
           follower_id: currentUserId,
-          following_id: userId,
+          following_id: targetUuid,
         });
         setIsFollowing(true);
         setFollowerCount(c => c + 1);
         // Send follow notification
         await ensureUserExists(currentUserId);
-        await ensureUserExists(userId);
+        await ensureUserExists(targetUuid);
         await supabase.from("notifications").insert({
-          recipient_id: userId,
+          recipient_id: targetUuid,
           sender_id: currentUserId,
           type: "follow",
           content: "started following you",
@@ -108,13 +133,48 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
     }
   };
 
-  const fetchProfileData = async () => {
+  const handleRemoveFollower = async (followerIdToRemove: string) => {
+    if (!currentUserId || !isOwnProfile) return; // Only allow removing your own followers
     try {
-      if (userId) {
+      await supabase.from("follows").delete()
+        .eq("follower_id", followerIdToRemove)
+        .eq("following_id", currentUserId); // currentUserId is the following_id here because it's YOUR profile
+      
+      setFollowerCount(c => Math.max(0, c - 1));
+      setFollowersList(prev => prev.filter(f => f.id !== followerIdToRemove));
+      toast.success("Follower removed");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to remove follower");
+    }
+  };
+
+  const [targetUuid, setTargetUuid] = useState<string | null>(null);
+
+  useEffect(() => {
+    const resolveAndFetch = async () => {
+      setLoading(true);
+      try {
+        let resolvedId = userId;
+        // If it's a username (e.g., '@dhruvv' or just 'dhruvv' without dashes)
+        if (userId && (userId.includes('@') || !userId.includes('-'))) {
+          const cleanUsername = userId.replace('@', '');
+          const { data, error } = await supabase
+            .from("profiles")
+            .select("id")
+            .eq("username", cleanUsername)
+            .maybeSingle();
+          if (data) {
+            resolvedId = data.id;
+          }
+        }
+        
+        setTargetUuid(resolvedId);
+
+        // Now fetch full profile data using resolvedId
         const { data: profile, error: profileError } = await supabase
           .from("profiles")
           .select("*")
-          .eq("id", userId)
+          .eq("id", resolvedId)
           .maybeSingle();
 
         if (profileError) throw profileError;
@@ -131,21 +191,12 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
           setEditMotivatorBio(profile.motivator_bio || "");
         } else {
           setProfileData({});
-          setEditFullName("");
-          setEditBio("");
-          setEditLocation("");
-          setEditAvatarUrl("");
-          setEditCoverUrl("");
-          setEditIsMotivator(false);
-          setEditInterests([]);
-          setEditMotivatorTitle("");
-          setEditMotivatorBio("");
         }
 
-        const { data: posts, error: postsError } = await supabase
+        const { data: posts } = await supabase
           .from("posts")
           .select("*")
-          .eq("user_id", userId)
+          .eq("user_id", resolvedId)
           .order("created_at", { ascending: false });
 
         const formattedPosts = (posts || []).map((post: any) => ({
@@ -165,13 +216,15 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
         }));
 
         setUserPosts(formattedPosts);
+      } catch (error) {
+        console.error("Error fetching profile data:", error);
+      } finally {
+        setLoading(false);
       }
-    } catch (error) {
-      console.error("Error fetching profile data:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
+
+    if (userId) resolveAndFetch();
+  }, [userId]);
 
   // Determine if this profile belongs to the logged-in user
   useEffect(() => {
@@ -181,27 +234,33 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
   }, []);
 
   useEffect(() => {
-    fetchProfileData();
+    if (targetUuid) {
+      // Realtime subscription for follow count
+      const subscription = supabase
+        .channel(`profile_followers:${targetUuid}`)
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "follows", filter: `following_id=eq.${targetUuid}` },
+          () => {
+            fetchFollowData(currentUserId);
+          }
+        )
+        .subscribe();
 
-    // Realtime subscription for follow count
-    const subscription = supabase
-      .channel(`profile_followers:${userId}`)
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "follows", filter: `following_id=eq.${userId}` },
-        () => {
-          // Re-fetch follower data when a change occurs in the follows table for this profile
-          fetchFollowData(currentUserId);
-        }
-      )
-      .subscribe();
+      return () => {
+        supabase.removeChannel(subscription);
+      };
+    }
+  }, [targetUuid, currentUserId]);
 
-    return () => {
-      supabase.removeChannel(subscription);
-    };
-  }, [userId, currentUserId]);
+  useEffect(() => {
+    if (targetUuid && currentUserId && targetUuid !== currentUserId) {
+      checkBuddyStatus();
+      fetchFollowData(currentUserId);
+    }
+  }, [targetUuid, currentUserId]);
 
-  const isOwnProfile = currentUserId === userId;
+  const isOwnProfile = currentUserId === targetUuid;
 
   // ── Buddy system ──────────────────────────────────────────────
   // Grid post modal
@@ -212,19 +271,19 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
   const [buddyCount, setBuddyCount] = useState(0);
 
   const fetchBuddies = async () => {
-    if (!userId) return;
+    if (!userId || !targetUuid) return;
     const { data, error } = await supabase
       .from('buddy_requests')
       .select('from_user, to_user')
       .eq('status', 'accepted')
-      .or(`from_user.eq.${userId},to_user.eq.${userId}`);
+      .or(`from_user.eq.${targetUuid},to_user.eq.${targetUuid}`);
 
     if (error || !data) return;
 
     // Use a Set to deduplicate buddy IDs
     const uniqueBuddyIds = new Set<string>();
     data.forEach((req: any) => {
-      const otherId = req.from_user === userId ? req.to_user : req.from_user;
+      const otherId = req.from_user === targetUuid ? req.to_user : req.from_user;
       if (otherId) uniqueBuddyIds.add(otherId);
     });
 
@@ -249,11 +308,11 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
   const [buddyLoading, setBuddyLoading] = useState(false);
 
   const checkBuddyStatus = async () => {
-    if (!currentUserId || !userId || currentUserId === userId) return;
+    if (!currentUserId || !targetUuid || currentUserId === targetUuid) return;
     const { data } = await supabase
       .from('buddy_requests')
       .select('id, status, from_user, to_user')
-      .or(`and(from_user.eq.${currentUserId},to_user.eq.${userId}),and(from_user.eq.${userId},to_user.eq.${currentUserId})`)
+      .or(`and(from_user.eq.${currentUserId},to_user.eq.${targetUuid}),and(from_user.eq.${targetUuid},to_user.eq.${currentUserId})`)
       .maybeSingle();
 
     if (!data) { setBuddyStatus(null); setBuddyRequestId(null); return; }
@@ -265,8 +324,7 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
 
   useEffect(() => {
     fetchBuddies();
-    checkBuddyStatus();
-  }, [userId, currentUserId]);
+  }, [targetUuid]);
 
   // ensureUserExists is now imported from ../utils/ensureUserExists
 
@@ -276,7 +334,7 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
     try {
       const { data, error } = await supabase
         .from('buddy_requests')
-        .insert({ from_user: currentUserId, to_user: userId, status: 'pending' })
+        .insert({ from_user: currentUserId, to_user: targetUuid, status: 'pending' })
         .select()
         .single();
       if (error) throw error;
@@ -285,9 +343,9 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
 
       // Notify receiver
       await ensureUserExists(currentUserId);
-      await ensureUserExists(userId);
+      await ensureUserExists(targetUuid);
       await supabase.from('notifications').insert({
-        recipient_id: userId,
+        recipient_id: targetUuid,
         sender_id: currentUserId,
         type: 'buddy_request',
         content: 'sent you a buddy request',
@@ -307,23 +365,20 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
     try {
       await supabase.from('buddy_requests').update({ status: 'accepted' }).eq('id', buddyRequestId);
 
-      // Create a permanent buddy chat
-      const { data: chat, error: chatError } = await supabase
-        .from('chats')
-        .insert({ type: 'buddy', status: 'permanent', last_message_at: new Date().toISOString() })
-        .select()
-        .single();
+      // Create or Upgrade a permanent buddy chat using the RPC to prevent duplicates
+      const { data: chatId, error: chatError } = await supabase.rpc("get_or_create_buddy_chat", {
+        p_user_id: currentUserId,
+        p_buddy_id: targetUuid
+      });
       if (chatError) throw chatError;
 
-      await supabase.from('chat_participants').insert([
-        { chat_id: chat.id, user_id: currentUserId },
-        { chat_id: chat.id, user_id: userId },
-      ]);
+      // Update the buddy request with the chat_id for reference
+      await supabase.from('buddy_requests').update({ chat_id: chatId }).eq('id', buddyRequestId);
 
       // Notify the sender
       await ensureUserExists(currentUserId);
       await supabase.from('notifications').insert({
-        recipient_id: userId,
+        recipient_id: targetUuid,
         sender_id: currentUserId,
         type: 'buddy_accepted',
         content: 'accepted your buddy request',
@@ -339,11 +394,46 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
     }
   };
 
+  const removeBuddy = async (buddyIdToRemove: string) => {
+    if (!currentUserId) return;
+    try {
+      // Find the buddy request connecting these two
+      const { data: request } = await supabase
+        .from('buddy_requests')
+        .select('id, chat_id')
+        .eq('status', 'accepted')
+        .or(`and(from_user.eq.${currentUserId},to_user.eq.${buddyIdToRemove}),and(from_user.eq.${buddyIdToRemove},to_user.eq.${currentUserId})`)
+        .maybeSingle();
+
+      if (request) {
+        // Delete the buddy request
+        await supabase.from('buddy_requests').delete().eq('id', request.id);
+        
+        // Ensure chat status gets downgraded or deleted. We'll simply let their connection break.
+        // If they had a buddy chat, we can optionally downgrade it or drop them as participants,
+        // but physically removing the buddy request record breaks the buddy bond.
+      }
+
+      setBuddiesList(prev => prev.filter(b => b.id !== buddyIdToRemove));
+      setBuddyCount(c => Math.max(0, c - 1));
+      
+      // If we are currently on the removed buddy's profile, reset buddyStatus
+      if (buddyIdToRemove === targetUuid || buddyIdToRemove === userId) {
+        setBuddyStatus(null);
+        setBuddyRequestId(null);
+      }
+      
+      toast.success("Buddy removed");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to remove buddy");
+    }
+  };
+
   // ──────────────────────────────────────────────────────────────
 
   // Share this profile's link
   const handleShareProfile = () => {
-    const url = `${window.location.origin}?profile=${userId}`;
+    const url = `${window.location.origin}?profile=${profileData?.username || targetUuid || userId}`;
     navigator.clipboard.writeText(url).then(() => {
       toast.success("Profile link copied to clipboard! 🔗");
     });
@@ -604,11 +694,42 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
                       </Button>
                     )}
                     {buddyStatus === 'accepted' && (
-                      <Button variant="outline" disabled className="rounded-xl" style={{ borderColor: 'var(--theme-primary)', color: 'var(--theme-primary)' }}>
-                        <UserCheck className="w-4 h-4 mr-2" />
-                        Buddies ✓
+                      <Button 
+                        variant="outline" 
+                        className="rounded-xl group hover:border-red-500 hover:text-red-500 hover:bg-red-50" 
+                        style={{ borderColor: 'var(--theme-primary)', color: 'var(--theme-primary)' }}
+                        onClick={() => removeBuddy(targetUuid)}
+                      >
+                        <UserCheck className="w-4 h-4 mr-2 group-hover:hidden" />
+                        <Trash2 className="w-4 h-4 mr-2 hidden group-hover:block" />
+                        <span className="group-hover:hidden">Buddies ✓</span>
+                        <span className="hidden group-hover:block">Remove Buddy</span>
                       </Button>
                     )}
+                    {/* Send Message Button — visible on other profiles */}
+                    <Button
+                      onClick={async () => {
+                        if (!currentUserId) return;
+                        // If they are buddies, get_or_create_buddy_chat will just return their existing chat.
+                        // If not, we use the message request function.
+                        const isAcceptedBuddy = buddyStatus === 'accepted';
+                        const rpcName = isAcceptedBuddy ? "get_or_create_buddy_chat" : "get_or_create_message_request_chat";
+                        
+                        const { data: chatId, error } = await supabase.rpc(rpcName, {
+                          p_user_id: currentUserId,
+                          ...(isAcceptedBuddy ? { p_buddy_id: targetUuid } : { p_target_id: targetUuid })
+                        });
+                        if (error) {
+                          toast.error("Failed to open chat");
+                        } else {
+                          onViewChange && onViewChange('chats', chatId);
+                        }
+                      }}
+                      className="rounded-xl shadow-md text-white border-none"
+                      style={{ background: '#0095f6' }}
+                    >
+                      💬 Message
+                    </Button>
                     {/* Share Profile — always visible on other profiles */}
                     <Button
                       variant="outline"
@@ -757,10 +878,11 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
         </div>
 
         <Tabs defaultValue="posts" className="w-full">
-          <TabsList className="grid w-full grid-cols-3 mb-6 rounded-xl shadow-md" style={{ backgroundColor: 'var(--theme-accent)' }}>
-            <TabsTrigger value="posts" className="rounded-xl"><BookOpen className="w-4 h-4 mr-2" />Posts</TabsTrigger>
-            <TabsTrigger value="buddies" className="rounded-xl"><Users className="w-4 h-4 mr-2" />Buddies</TabsTrigger>
-            <TabsTrigger value="about" className="rounded-xl"><Users className="w-4 h-4 mr-2" />About</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-4 mb-6 rounded-xl shadow-md" style={{ backgroundColor: 'var(--theme-accent)' }}>
+            <TabsTrigger value="posts" className="rounded-xl px-1 text-xs sm:text-sm"><BookOpen className="w-4 h-4 sm:mr-2 flex-shrink-0" /><span className="hidden sm:inline">Posts</span></TabsTrigger>
+            <TabsTrigger value="buddies" className="rounded-xl px-1 text-xs sm:text-sm"><Smile className="w-4 h-4 sm:mr-2 flex-shrink-0" /><span className="hidden sm:inline">Buddies</span></TabsTrigger>
+            <TabsTrigger value="followers" className="rounded-xl px-1 text-xs sm:text-sm"><Users className="w-4 h-4 sm:mr-2 flex-shrink-0" /><span className="hidden sm:inline">Followers</span></TabsTrigger>
+            <TabsTrigger value="about" className="rounded-xl px-1 text-xs sm:text-sm"><Award className="w-4 h-4 sm:mr-2 flex-shrink-0" /><span className="hidden sm:inline">About</span></TabsTrigger>
           </TabsList>
 
           <TabsContent value="posts">
@@ -883,12 +1005,60 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
                         @{buddy.username || 'user'}
                       </p>
                     </div>
-                    <Badge
-                      className="flex-shrink-0 text-xs px-3 py-1 rounded-full"
-                      style={{ backgroundColor: 'var(--theme-accent)', color: 'var(--theme-primary)' }}
-                    >
-                      ❤️ Buddy
-                    </Badge>
+                    {isOwnProfile ? (
+                      <div className="flex gap-2 flex-shrink-0">
+                        <Button
+                          size="sm"
+                          className="rounded-xl flex-shrink-0"
+                          style={{ background: '#0095f6', color: 'white', border: 'none' }}
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            console.log("Buddy Chat Button clicked:", { currentUserId, buddyId: buddy.id });
+                            try {
+                              const { data: chatId, error } = await supabase.rpc("get_or_create_buddy_chat", {
+                                p_user_id: currentUserId,
+                                p_buddy_id: buddy.id,
+                              });
+                              console.log("Buddy Chat RPC Result:", { chatId, error });
+                              if (error) {
+                                toast.error("Failed to open chat");
+                                console.error("Chat RPC Error:", error);
+                                return;
+                              }
+                              console.log("Triggering onViewChange('chats', ...)", chatId);
+                              if (onViewChange) {
+                                onViewChange('chats', chatId);
+                              } else {
+                                console.error("onViewChange is UNDEFINED in ProfilePage");
+                              }
+                            } catch (err) {
+                              console.error("Chat button click error:", err);
+                              toast.error("An error occurred trying to open chat");
+                            }
+                          }}
+                        >
+                          💬 Chat
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="rounded-xl flex-shrink-0 border-red-200 text-red-500 hover:bg-red-50"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeBuddy(buddy.id);
+                          }}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <Badge
+                        className="flex-shrink-0 text-xs px-3 py-1 rounded-full"
+                        style={{ backgroundColor: 'var(--theme-accent)', color: 'var(--theme-primary)' }}
+                      >
+                        ❤️ Buddy
+                      </Badge>
+                    )}
                   </div>
                 ))}
               </div>
@@ -899,6 +1069,61 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
                 <p className="text-sm mt-2" style={{ color: 'var(--theme-text)', opacity: 0.4 }}>
                   Connect through Talking Buddy or send a buddy request.
                 </p>
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="followers">
+            {followersList.length > 0 ? (
+              <div className="space-y-3">
+                <p className="text-sm font-semibold mb-4" style={{ color: 'var(--theme-text)', opacity: 0.6 }}>
+                  {followerCount} {followerCount === 1 ? 'Follower' : 'Followers'}
+                </p>
+                {followersList.map((follower: any) => (
+                  <div
+                    key={follower.id}
+                    className="flex items-center gap-4 p-4 rounded-2xl transition-shadow hover:shadow-md cursor-pointer"
+                    style={{ backgroundColor: 'var(--theme-card-bg)', border: '1px solid var(--theme-primary)22' }}
+                    onClick={() => onViewChange && onViewChange('profile', follower.id)}
+                  >
+                    <Avatar className="w-12 h-12 flex-shrink-0">
+                      <AvatarImage
+                        src={follower.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(follower.full_name || 'U')}&background=random`}
+                        alt={follower.full_name}
+                      />
+                      <AvatarFallback style={{ backgroundColor: 'var(--theme-accent)', color: 'var(--theme-primary)' }}>
+                        {(follower.full_name || 'U').charAt(0)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold truncate" style={{ color: 'var(--theme-text)' }}>
+                        {follower.full_name || 'Unknown'}
+                      </p>
+                      <p className="text-sm truncate" style={{ color: 'var(--theme-text)', opacity: 0.6 }}>
+                        @{follower.username || 'user'}
+                      </p>
+                    </div>
+                    {isOwnProfile && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-shrink-0 rounded-xl"
+                        style={{ borderColor: 'rgba(128,128,128,0.3)', color: 'var(--theme-text)' }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRemoveFollower(follower.id);
+                        }}
+                      >
+                        Remove
+                      </Button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-12 bg-[var(--theme-accent)]/10 rounded-3xl">
+                <Users className="w-12 h-12 mx-auto mb-4 opacity-20" style={{ color: 'var(--theme-primary)' }} />
+                <p style={{ color: 'var(--theme-text)', opacity: 0.6 }}>No followers yet.</p>
               </div>
             )}
           </TabsContent>
