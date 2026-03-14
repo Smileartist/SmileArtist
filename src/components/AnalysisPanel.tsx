@@ -104,7 +104,7 @@ export function AnalysisPanel({ loading, result, theme }: AnalysisPanelProps) {
                                 </motion.div>
 
                                 <h3 className="text-lg font-medium" style={{ color: 'var(--theme-text)' }}>
-                                    TalkingBuddy Analysis
+                                    AI Analysis
                                 </h3>
                             </div>
                         </motion.div>

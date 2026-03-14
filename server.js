@@ -1,7 +1,7 @@
 import express from "express";
 import cors from "cors";
 import bodyParser from "body-parser";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import OpenAI from "openai";
 import dotenv from "dotenv";
 
 // Load environment variables from .env file
@@ -11,9 +11,9 @@ const app = express();
 app.use(cors());
 app.use(bodyParser.json());
 
-// Initialize Gemini
-const genAI = process.env.GEMINI_API_KEY
-  ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
+// Initialize OpenAI
+const openai = process.env.OPENAI_API_KEY
+  ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
   : null;
 
 app.get("/health", (req, res) => {
@@ -21,8 +21,8 @@ app.get("/health", (req, res) => {
 });
 
 app.post("/api/analyze", async (req, res) => {
-  if (!genAI) {
-    return res.status(503).json({ error: "GEMINI_API_KEY is missing. Add it to .env" });
+  if (!openai) {
+    return res.status(503).json({ error: "OPENAI_API_KEY is missing. Add it to .env" });
   }
 
   try {
@@ -32,13 +32,11 @@ app.post("/api/analyze", async (req, res) => {
       return res.status(400).json({ error: "No content provided" });
     }
 
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-
     const prompt = `
     You are 'VerseVibe', a supportive and insightful AI companion for poets and creative writers.
     Analyze this text: "${content}"
 
-    IMPORTANT: Respond ONLY with a valid JSON object. No markdown, no code fences, no extra text.
+    IMPORTANT: Respond ONLY with a valid JSON object.
     {
         "sentiment": "One word (choose from: Melancholic, Joyful, Dark, Energetic, Peaceful, Thoughtful, Romantic, Mysterious)",
         "suggestions": "Two warm, encouraging sentences of constructive feedback",
@@ -48,8 +46,16 @@ app.post("/api/analyze", async (req, res) => {
     }
     `;
 
-    const result = await model.generateContent(prompt);
-    const text = result.response.text();
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: "You are a helpful assistant that responds in JSON format." },
+        { role: "user", content: prompt }
+      ],
+      response_format: { type: "json_object" }
+    });
+
+    const text = response.choices[0].message.content;
 
     res.json({ analysis: text });
   } catch (e) {
