@@ -513,7 +513,14 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
       setCoverFile(null);
       toast.success("Profile updated successfully!");
       setIsEditing(false);
-      await fetchProfileData();
+      
+      // Update local profileData without refetching since fetchProfileData is not in scope here
+      if (data && data.length > 0) {
+        setProfileData(data[0]);
+      } else {
+        setProfileData((prev: any) => ({ ...prev, ...updateData }));
+      }
+      
       await refreshAvatar();
     } catch (error: any) {
       console.error("Final error during profile update:", error);

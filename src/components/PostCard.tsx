@@ -23,81 +23,33 @@ interface PostCardProps {
 }
 
 export function PostCard({ post, onDelete }: PostCardProps) {
-  const { onViewChange, userId: currentUserId } = useUserData();
+  const { onViewChange, userId: currentUserId, likedPostIds, savedPostIds, toggleLikedPost, toggleSavedPost } = useUserData();
   const { postId, author, content, title, likes, comments: initialComments, created_at: timestamp, category, user_id } = post;
 
-  // 🔥 FIX: do NOT trust posts.likes anymore
-  const [likeCount, setLikeCount] = useState(0);
-  const [liked, setLiked] = useState<boolean | null>(null);
-  const [saved, setSaved] = useState(false);
+  const [likeCount, setLikeCount] = useState(likes || 0);
   const [showCommentModal, setShowCommentModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [commentCount, setCommentCount] = useState(initialComments);
 
-  useEffect(() => {
-    const checkState = async () => {
-      if (!currentUserId) {
-        setLiked(false);
-        return;
-      }
-
-      // ✅ Always fetch real like count from post_likes
-      const { count } = await supabase
-        .from("post_likes")
-        .select("*", { count: "exact", head: true })
-        .eq("post_id", postId);
-
-      setLikeCount(count || 0);
-
-      const { data: likeRow } = await supabase
-        .from("post_likes")
-        .select("post_id")
-        .eq("post_id", postId)
-        .eq("user_id", currentUserId)
-        .maybeSingle();
-
-      setLiked(!!likeRow);
-
-      const { data: saveRow } = await supabase
-        .from("saved_posts")
-        .select("post_id")
-        .eq("post_id", postId)
-        .eq("user_id", currentUserId)
-        .maybeSingle();
-
-      if (saveRow) setSaved(true);
-    };
-
-    checkState();
-
-  }, [postId, currentUserId]);
+  const isLiked = likedPostIds.has(postId);
+  const isSaved = savedPostIds.has(postId);
 
   const handleLike = async () => {
     if (!currentUserId) return alert("Login required");
 
-    const prevLiked = liked || false;
+    const prevLiked = isLiked;
     const prevLikeCount = likeCount;
 
     // Optimistic UI
-    setLiked(!prevLiked);
+    toggleLikedPost(postId, !prevLiked);
     setLikeCount(prevLiked ? Math.max(0, prevLikeCount - 1) : prevLikeCount + 1);
 
     try {
-      const { newLikes, isLiked } = await handleLikeUtil(postId, prevLikeCount, currentUserId);
-
-      setLiked(isLiked);
+      const { newLikes, isLiked: serverIsLiked } = await handleLikeUtil(postId, prevLikeCount, currentUserId);
+      toggleLikedPost(postId, serverIsLiked);
       setLikeCount(newLikes);
-
-      // Safety: re-fetch true count to avoid drift
-      const { count } = await supabase
-        .from("post_likes")
-        .select("*", { count: "exact", head: true })
-        .eq("post_id", postId);
-
-      setLikeCount(count || 0);
-
     } catch (error) {
-      setLiked(prevLiked);
+      toggleLikedPost(postId, prevLiked);
       setLikeCount(prevLikeCount);
       console.error("Error handling like:", error);
     }
@@ -106,14 +58,14 @@ export function PostCard({ post, onDelete }: PostCardProps) {
   const handleSave = async () => {
     if (!currentUserId) return alert("Login required");
 
-    const prevSaved = saved;
-    setSaved(!prevSaved);
+    const prevSaved = isSaved;
+    toggleSavedPost(postId, !prevSaved);
 
     try {
-      const isSaved = await handleSaveUtil(postId, currentUserId);
-      setSaved(isSaved);
+      const serverIsSaved = await handleSaveUtil(postId, currentUserId);
+      toggleSavedPost(postId, serverIsSaved);
     } catch (error) {
-      setSaved(prevSaved);
+      toggleSavedPost(postId, prevSaved);
       console.error("Error handling save:", error);
     }
   };
@@ -245,8 +197,8 @@ export function PostCard({ post, onDelete }: PostCardProps) {
         <button onClick={handleLike} className="flex items-center gap-2">
           <Heart
             className="w-5 h-5"
-            fill={liked === true ? "var(--theme-primary)" : "none"}
-            color={liked === true ? "var(--theme-primary)" : "currentColor"}
+            fill={isLiked ? "var(--theme-primary)" : "none"}
+            color={isLiked ? "var(--theme-primary)" : "currentColor"}
           />
           <span>{likeCount}</span>
         </button>
@@ -266,8 +218,8 @@ export function PostCard({ post, onDelete }: PostCardProps) {
         <button onClick={handleSave} className="ml-auto">
           <Bookmark
             className="w-5 h-5"
-            fill={saved ? "var(--theme-primary)" : "none"}
-            color={saved ? "var(--theme-primary)" : "currentColor"}
+            fill={isSaved ? "var(--theme-primary)" : "none"}
+            color={isSaved ? "var(--theme-primary)" : "currentColor"}
           />
         </button>
       </div>
@@ -283,6 +235,10 @@ export function PostCard({ post, onDelete }: PostCardProps) {
         postId={postId}
         postTitle={title}
         postContent={content}
+        authorName={author?.full_name || "Anonymous"}
+        authorAvatar={author?.avatar_url || ""}
+        likes={likeCount}
+        comments={commentCount}
         isOpen={showShareModal}
         onClose={() => setShowShareModal(false)}
         onViewChange={onViewChange}

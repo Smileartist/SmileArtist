@@ -24,15 +24,25 @@ export const UserDataContext = createContext<{
   avatarUrl: string | null;
   username: string;
   userId: string;
+  likedPostIds: Set<string>;
+  savedPostIds: Set<string>;
   refreshAvatar: () => Promise<void>;
   refreshUserData: () => Promise<void>;
+  refreshInteractions: () => Promise<void>;
+  toggleLikedPost: (postId: string, isLiked: boolean) => void;
+  toggleSavedPost: (postId: string, isSaved: boolean) => void;
   onViewChange: (view: string, userId?: string | null) => void;
 }>({
   avatarUrl: null,
   username: "",
   userId: "",
+  likedPostIds: new Set(),
+  savedPostIds: new Set(),
   refreshAvatar: async () => { },
   refreshUserData: async () => { },
+  refreshInteractions: async () => { },
+  toggleLikedPost: () => { },
+  toggleSavedPost: () => { },
   onViewChange: () => { },
 });
 
@@ -58,6 +68,40 @@ function AppContent() {
     }
   };
 
+  const [likedPostIds, setLikedPostIds] = useState<Set<string>>(new Set());
+  const [savedPostIds, setSavedPostIds] = useState<Set<string>>(new Set());
+
+  const fetchInteractions = async (id: string) => {
+    try {
+      const [likesRes, savesRes] = await Promise.all([
+        supabase.from("post_likes").select("post_id").eq("user_id", id),
+        supabase.from("saved_posts").select("post_id").eq("user_id", id)
+      ]);
+      setLikedPostIds(new Set(likesRes.data?.map(d => d.post_id) || []));
+      setSavedPostIds(new Set(savesRes.data?.map(d => d.post_id) || []));
+    } catch (e) {
+      console.error("Error fetching interactions", e);
+    }
+  };
+
+  const toggleLikedPost = (postId: string, isLiked: boolean) => {
+    setLikedPostIds(prev => {
+      const next = new Set(prev);
+      if (isLiked) next.add(postId);
+      else next.delete(postId);
+      return next;
+    });
+  };
+
+  const toggleSavedPost = (postId: string, isSaved: boolean) => {
+    setSavedPostIds(prev => {
+      const next = new Set(prev);
+      if (isSaved) next.add(postId);
+      else next.delete(postId);
+      return next;
+    });
+  };
+
   useEffect(() => {
 
     const getSession = async () => {
@@ -74,6 +118,7 @@ function AppContent() {
           setUserId(user.id);
           setIsLoggedIn(true);
           fetchProfileData(user.id);
+          fetchInteractions(user.id);
         }
         // else: incomplete signup — stay on login screen
       } else {
@@ -109,6 +154,7 @@ function AppContent() {
     setIsLoggedIn(true);
     // Then fetch the authoritative username from the DB (handles existing users too)
     fetchProfileData(userIdParam);
+    fetchInteractions(userIdParam);
   };
 
   const handleLogout = async () => {
@@ -275,11 +321,21 @@ function AppContent() {
   };
 
   const refreshUserData = async () => {
-    if (userId) await fetchProfileData(userId);
+    if (userId) {
+      await fetchProfileData(userId);
+      await fetchInteractions(userId);
+    }
   };
 
   return (
-    <UserDataContext.Provider value={{ avatarUrl, username, userId, refreshAvatar, refreshUserData, onViewChange: handleViewChange }}>
+    <UserDataContext.Provider value={{ 
+      avatarUrl, username, userId, 
+      likedPostIds, savedPostIds, 
+      toggleLikedPost, toggleSavedPost,
+      refreshAvatar, refreshUserData, 
+      refreshInteractions: async () => { if (userId) await fetchInteractions(userId); },
+      onViewChange: handleViewChange 
+    }}>
       <div
         className="min-h-screen transition-colors duration-300"
         style={{

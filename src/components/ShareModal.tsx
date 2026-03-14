@@ -9,6 +9,10 @@ interface ShareModalProps {
   postId: string;
   postTitle?: string;
   postContent: string;
+  authorName: string;
+  authorAvatar: string;
+  likes: number;
+  comments: number;
   isOpen: boolean;
   onClose: () => void;
   onViewChange?: (view: string, userId?: string | null) => void;
@@ -28,6 +32,10 @@ export function ShareModal({
   postId,
   postTitle,
   postContent,
+  authorName,
+  authorAvatar,
+  likes,
+  comments,
   isOpen,
   onClose,
   onViewChange,
@@ -143,9 +151,8 @@ export function ShareModal({
         ? postContent.slice(0, 120) + "…"
         : postContent;
 
-    const messageText = postTitle
-      ? `📖 *${postTitle}*\n\n${preview}`
-      : `📖 ${preview}`;
+    // Rich format: [R_POST:id]authorName|authorAvatar|likes|comments|title|preview
+    const messageText = `[R_POST:${postId}]${authorName}|${authorAvatar}|${likes}|${comments}|${postTitle || ""}|||${preview.replace(/\n/g, ' ')}`;
 
     try {
       for (const buddyId of selected) {

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { Button } from "./ui/button";
-import { ChevronLeft, Search, Trash2, Image as ImageIcon } from "lucide-react";
+import { ChevronLeft, Search, Trash2, Image as ImageIcon, BookOpen, ChevronRight, Heart, MessageCircle } from "lucide-react";
 import { supabase } from "../utils/supabaseClient";
 import { useUserData } from "../App";
 
@@ -207,14 +207,34 @@ export function ChatsPage({ activeChatId, onViewChange }: ChatsPageProps) {
                 }
             });
 
-            const formatChat = async (chat: Chat, isAnon: boolean): Promise<FormattedChat> => {
+            // Optimize N+1 queries by fetching all distinct participant profiles in a single query
+            const distinctUserIds = new Set<string>();
+            const allUnformatted = [...buddyChats.map(c => ({ chat: c, isAnon: false })), ...anonChats.map(c => ({ chat: c, isAnon: true }))];
+            
+            allUnformatted.forEach(({ chat, isAnon }) => {
+                const other = chat.chat_participants.find((p: any) => p.user_id !== currentUserId);
+                if (other?.user_id && (!isAnon || chat.type === 'message_request')) {
+                    distinctUserIds.add(other.user_id);
+                }
+            });
+
+            const profilesMap = new Map<string, ProfileData>();
+            if (distinctUserIds.size > 0) {
+                const { data: profiles } = await supabase
+                    .from("profiles")
+                    .select("id, full_name, username, avatar_url")
+                    .in("id", Array.from(distinctUserIds));
+                
+                (profiles || []).forEach(p => profilesMap.set(p.id, p as ProfileData));
+            }
+
+            const formatChat = (chat: Chat, isAnon: boolean): FormattedChat => {
                 const other = chat.chat_participants.find((p: any) => p.user_id !== currentUserId);
                 let profile: ProfileData | null = null;
                 const isMsgReq = chat.type === 'message_request';
 
                 if (other?.user_id && (!isAnon || isMsgReq)) {
-                    const { data: p } = await supabase.from("profiles").select("id, full_name, username, avatar_url").eq("id", other.user_id).single();
-                    if (p) profile = p as ProfileData;
+                    profile = profilesMap.get(other.user_id) || null;
                 } else if (other?.user_id && isAnon && !isMsgReq) {
                     profile = { id: other.user_id, full_name: "Anonymous User", username: "anonymous", avatar_url: "" };
                 }
@@ -222,7 +242,7 @@ export function ChatsPage({ activeChatId, onViewChange }: ChatsPageProps) {
                 return { ...chat, messages: [], otherParticipant: profile, lastMessage: sorted[0] || null, isAnonymous: isAnon, expiresIn: isAnon ? getExpiryLabel(chat.created_at) : undefined };
             };
 
-            const all = await Promise.all([...buddyChats.map(c => formatChat(c, false)), ...anonChats.map(c => formatChat(c, true))]);
+            const all = allUnformatted.map(({ chat, isAnon }) => formatChat(chat, isAnon));
 
             // Deduplicate by other participant ID — buddy chats take priority over anon chats
             const uniqueMap = new Map<string, FormattedChat>();
@@ -416,9 +436,40 @@ export function ChatsPage({ activeChatId, onViewChange }: ChatsPageProps) {
         } catch (err) { console.error("Delete error:", err); }
     };
 
-    // Parse image URLs from message content
-    const parseMessage = (msg: ChatMessage): { text: string; imageUrl?: string } => {
+    // Parse image URLs and shared posts from message content
+    const parseMessage = (msg: ChatMessage): { text: string; imageUrl?: string; sharedPost?: { id: string; title: string; preview: string; authorName?: string; authorAvatar?: string; likes?: number; comments?: number } } => {
         if (msg.image_url) return { text: "", imageUrl: msg.image_url };
+        
+        // 1. Match new rich shared posts: [R_POST:id]authorName|authorAvatar|likes|comments|title|||preview
+        const richMatch = msg.content.match(/^\[R_POST:(.+?)\](.*?)\|(.*?)\|(.*?)\|(.*?)\|(.*?)\|\|\|(.*)$/);
+        if (richMatch) {
+            return {
+                text: "",
+                sharedPost: {
+                    id: richMatch[1],
+                    authorName: richMatch[2],
+                    authorAvatar: richMatch[3],
+                    likes: parseInt(richMatch[4], 10) || 0,
+                    comments: parseInt(richMatch[5], 10) || 0,
+                    title: richMatch[6] || "Shared Post",
+                    preview: richMatch[7]
+                }
+            };
+        }
+
+        // 2. Match old shared posts for backward compatibility: [SHARED_POST:id]Title|||Preview
+        const sharedMatch = msg.content.match(/^\[SHARED_POST:(.+?)\](.*)\|\|\|(.*)$/);
+        if (sharedMatch) {
+            return {
+                text: "",
+                sharedPost: {
+                    id: sharedMatch[1],
+                    title: sharedMatch[2] || "Shared Post",
+                    preview: sharedMatch[3]
+                }
+            };
+        }
+
         const imgMatch = msg.content.match(/\[img\](.*?)\[\/img\]/);
         if (imgMatch) return { text: "", imageUrl: imgMatch[1] };
         return { text: msg.content };
@@ -543,10 +594,10 @@ export function ChatsPage({ activeChatId, onViewChange }: ChatsPageProps) {
     };
 
     return (
-        <div className="chat-container" style={{ background: 'var(--theme-background, #000)', color: 'var(--theme-text, #fff)' }}>
+        <div className="chat-container" style={{ background: 'transparent', color: 'var(--theme-text, #fff)' }}>
 
             {/* ════════ LEFT: Chat List ════════ */}
-            <div className={`chat-sidebar ${currentChatId ? 'sidebar-hidden' : ''}`} style={{ background: 'var(--theme-background, #000)', display: 'flex', flexDirection: 'column' }}>
+            <div className={`chat-sidebar ${currentChatId ? 'sidebar-hidden' : ''}`} style={{ background: 'transparent', flexDirection: 'column' }}>
                 {/* Header */}
                 <div style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(128,128,128,0.12)' }}>
                     <h2 style={{ fontWeight: 700, fontSize: '22px' }}>{username || "Messages"}</h2>
@@ -598,7 +649,12 @@ export function ChatsPage({ activeChatId, onViewChange }: ChatsPageProps) {
                 <div style={{ flex: 1, overflowY: 'auto', paddingBottom: '80px' }}>
                     {filteredChats.length > 0 ? filteredChats.map(chat => {
                         const isActive = chat.id === currentChatId;
-                        const lastContent = chat.lastMessage?.content?.match(/\[img\]/) ? "📷 Photo" : chat.lastMessage?.content;
+                        const content = chat.lastMessage?.content || "";
+                        const lastContent = content.match(/\[img\]/) 
+                            ? "📷 Photo" 
+                            : (content.includes("[R_POST:") || content.includes("[SHARED_POST:"))
+                                ? "Shared a post"
+                                : content;
                         return (
                             <div key={chat.id}
                                 onClick={() => setCurrentChatId(chat.id)}
@@ -686,18 +742,18 @@ export function ChatsPage({ activeChatId, onViewChange }: ChatsPageProps) {
             )}
 
             {/* ════════ RIGHT: Active Chat ════════ */}
-            <div className={`chat-main ${!currentChatId ? 'main-hidden' : ''}`} style={{ background: 'var(--theme-background, #000)', display: 'flex', flexDirection: 'column' }}>
+            <div className={`chat-main ${!currentChatId ? 'main-hidden' : ''}`} style={{ background: 'transparent', flexDirection: 'column' }}>
                 {currentChatId && activeChatData ? (
                     <>
                         {/* ── Header ── */}
                         <div style={{
                             padding: '10px 12px', borderBottom: '1px solid rgba(128,128,128,0.12)',
                             display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0,
-                            background: 'var(--theme-background, #000)',
+                            background: 'transparent',
                         }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                <button className="chat-back-btn" onClick={() => { setCurrentChatId(null); onViewChange?.('chats', null); }}
-                                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: 'inherit', display: 'flex', alignItems: 'center' }}>
+                                <button className="chat-back-btn" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setCurrentChatId(null); onViewChange?.('chats', null); }}
+                                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: 'inherit', display: 'flex', alignItems: 'center', zIndex: 10 }}>
                                     <ChevronLeft style={{ width: '28px', height: '28px' }} />
                                 </button>
                                 {isTemporaryAnon ? <AnonAvatar size={32} /> : (
@@ -784,11 +840,78 @@ export function ChatsPage({ activeChatId, onViewChange }: ChatsPageProps) {
                                                 onClick={() => setPreviewImage(parsed.imageUrl!)}
                                                 style={{ opacity: msg.id.startsWith('optimistic-') ? 0.6 : 1 }}
                                             />
+                                        ) : parsed.sharedPost ? (
+                                            <div 
+                                                onClick={() => {
+                                                    // Standard deep-link to post
+                                                    window.location.href = `/?post=${parsed.sharedPost!.id}`;
+                                                }}
+                                                style={{
+                                                    width: '240px',
+                                                    background: '#fff',
+                                                    color: '#000',
+                                                    borderRadius: '24px',
+                                                    padding: '14px',
+                                                    boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+                                                    cursor: 'pointer',
+                                                    opacity: msg.id.startsWith('optimistic-') ? 0.6 : 1,
+                                                    border: '1px solid rgba(0,0,0,0.05)'
+                                                }}
+                                                className="hover:opacity-95 transition-opacity"
+                                            >
+                                                {/* Author Header */}
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+                                                    <Avatar className="w-6 h-6" style={{ border: '1px solid #eee' }}>
+                                                        <AvatarImage src={parsed.sharedPost.authorAvatar} />
+                                                        <AvatarFallback style={{ fontSize: '10px' }}>{parsed.sharedPost.authorName?.[0]}</AvatarFallback>
+                                                    </Avatar>
+                                                    <span style={{ fontSize: '13px', fontWeight: 600, color: '#333' }}>
+                                                        {parsed.sharedPost.authorName || "User"}
+                                                    </span>
+                                                </div>
+
+                                                {/* Title */}
+                                                <h4 style={{ 
+                                                    fontWeight: 800, 
+                                                    fontSize: '16px', 
+                                                    color: 'var(--theme-primary, #B8860B)', 
+                                                    marginBottom: '4px', 
+                                                    lineHeight: 1.25 
+                                                }}>
+                                                    {parsed.sharedPost.title}
+                                                </h4>
+
+                                                {/* Preview */}
+                                                <p style={{ 
+                                                    fontSize: '13px', 
+                                                    color: '#555', 
+                                                    lineHeight: 1.45, 
+                                                    margin: 0, 
+                                                    display: '-webkit-box', 
+                                                    WebkitLineClamp: 4, 
+                                                    WebkitBoxOrient: 'vertical', 
+                                                    overflow: 'hidden' 
+                                                }}>
+                                                    {parsed.sharedPost.preview}
+                                                </p>
+
+                                                {/* Stats Footer */}
+                                                <div style={{ marginTop: '12px', display: 'flex', gap: '12px', color: '#888' }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', fontWeight: 500 }}>
+                                                        <Heart fill="#FF4B7D" color="#FF4B7D" style={{ width: '14px', height: '14px' }} />
+                                                        <span>{parsed.sharedPost.likes || 0}</span>
+                                                    </div>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', fontWeight: 500 }}>
+                                                        <MessageCircle style={{ width: '14px', height: '14px', opacity: 0.6 }} />
+                                                        <span>{parsed.sharedPost.comments || 0}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
                                         ) : (
                                             <div style={{
                                                 maxWidth: '70%', padding: '8px 14px', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
                                                 fontSize: '15px', lineHeight: 1.4,
-                                                background: isMe ? '#3797F0' : 'rgba(128,128,128,0.15)',
+                                                background: isMe ? 'var(--theme-chat-my-bg, #3797F0)' : 'var(--theme-chat-other-bg, rgba(128,128,128,0.15))',
                                                 color: isMe ? '#fff' : 'inherit',
                                                 borderRadius: isMe
                                                     ? `18px ${!consecutive ? '18px' : '4px'} 4px 18px`
@@ -871,8 +994,8 @@ export function ChatsPage({ activeChatId, onViewChange }: ChatsPageProps) {
                         </div>
                     </>
                 ) : (
-                    /* Empty State */
-                    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px', textAlign: 'center' }}>
+                    /* Empty State - Only show on desktop */
+                    <div className="chat-empty-state" style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px', textAlign: 'center' }}>
                         <div style={{ width: '96px', height: '96px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '16px', border: '2px solid currentColor' }}>
                             <svg fill="none" height="48" viewBox="0 0 96 96" width="48"><path d="M48 0C21.532 0 0 21.533 0 48s21.532 48 48 48 48-21.532 48-48S74.468 0 48 0Zm0 94C22.636 94 2 73.364 2 48S22.636 2 48 2s46 20.636 46 46-20.636 46-46 46Zm12.227-53.284-7.257 5.507c-.49.37-1.166.375-1.661.005l-5.373-4.031a3.453 3.453 0 0 0-4.989.921l-6.756 10.718c-.653 1.027.615 2.189 1.582 1.453l7.257-5.507a1.382 1.382 0 0 1 1.661-.005l5.373 4.031a3.453 3.453 0 0 0 4.989-.92l6.756-10.719c.653-1.027-.615-2.189-1.582-1.453ZM48 25c-12.958 0-23 9.492-23 22.31 0 6.706 2.749 12.5 7.224 16.503.375.338.602.806.62 1.31l.125 4.091a1.845 1.845 0 0 0 2.582 1.629l4.563-2.013a1.844 1.844 0 0 1 1.227-.093c2.096.579 4.331.884 6.659.884 12.958 0 23-9.491 23-22.31S60.958 25 48 25Zm0 42.621c-2.114 0-4.175-.273-6.133-.813a3.834 3.834 0 0 0-2.56.192l-4.346 1.917-.118-3.867a3.833 3.833 0 0 0-1.286-2.727C29.33 58.54 27 53.209 27 47.31 27 35.73 36.566 27 48 27s21 8.73 21 20.31-9.434 20.31-21 20.31Z" fill="currentColor"></path></svg>
                         </div>

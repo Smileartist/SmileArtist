@@ -3526,7 +3526,9 @@ html {
 .chat-container {
   display: flex;
   flex-direction: column;
-  height: 100dvh;
+  height: calc(100vh - 64px - env(safe-area-inset-bottom, 50px));
+  height: calc(100dvh - 64px - env(safe-area-inset-bottom, 50px));
+  padding-top: 64px;
   overflow: hidden;
   width: 100%;
   position: fixed;
@@ -3546,7 +3548,7 @@ html {
 }
 
 .chat-sidebar.sidebar-hidden {
-  display: none;
+  display: none !important;
 }
 
 .chat-main {
@@ -3558,7 +3560,7 @@ html {
 }
 
 .chat-main.main-hidden {
-  display: none;
+  display: none !important;
 }
 
 .chat-back-btn {
@@ -3600,6 +3602,7 @@ html {
   .chat-container {
     flex-direction: row;
     position: relative;
+    padding: 0;
     height: calc(100vh - 80px);
     border-radius: 0.75rem;
     border: 1px solid rgba(128, 128, 128, 0.2);
