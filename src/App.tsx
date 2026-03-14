@@ -365,7 +365,7 @@ function AppContent() {
         <Navigation activeView={activeView} onViewChange={handleViewChange} />
         <MobileHeader onViewChange={handleViewChange} activeView={activeView} />
         <MobileNavigation activeView={activeView} onViewChange={handleViewChange} />
-        <main className={`md:ml-64 max-w-none ${activeView === 'chats' ? 'pt-16 md:pt-0 p-0 h-screen overflow-hidden' : 'pt-16 pb-20 px-0 md:pt-0 md:pb-8 md:p-8'}`}>
+        <main className={`md:ml-64 max-w-none ${activeView === 'chats' ? 'pt-16 md:pt-0 p-0 pb-20 md:pb-0 h-screen overflow-hidden flex flex-col' : 'pt-16 pb-20 px-0 md:pt-0 md:pb-8 md:p-8'}`}>
           {renderContent()}
         </main>
         <PostModal postId={selectedPostId} onClose={() => { setSelectedPostId(null); handleViewChange(activeView); }} />
