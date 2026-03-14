@@ -26,6 +26,7 @@ export const UserDataContext = createContext<{
   avatarUrl: string | null;
   username: string;
   userId: string;
+  isInstallable: boolean;
   likedPostIds: Set<string>;
   savedPostIds: Set<string>;
   refreshAvatar: () => Promise<void>;
@@ -34,10 +35,12 @@ export const UserDataContext = createContext<{
   toggleLikedPost: (postId: string, isLiked: boolean) => void;
   toggleSavedPost: (postId: string, isSaved: boolean) => void;
   onViewChange: (view: string, targetId?: string | null, showComments?: boolean) => void;
+  showInstallPrompt: () => Promise<void>;
 }>({
   avatarUrl: null,
   username: "",
   userId: "",
+  isInstallable: false,
   likedPostIds: new Set(),
   savedPostIds: new Set(),
   refreshAvatar: async () => { },
@@ -46,6 +49,7 @@ export const UserDataContext = createContext<{
   toggleLikedPost: () => { },
   toggleSavedPost: () => { },
   onViewChange: () => { },
+  showInstallPrompt: async () => { },
 });
 
 export const useUserData = () => useContext(UserDataContext);
@@ -59,6 +63,39 @@ function AppContent() {
   const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null); // New state for selected user profile
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
   const [initialShowComments, setInitialShowComments] = useState(false);
+
+  // ── PWA Installation ──────────────────────────────────────────
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [isInstallable, setIsInstallable] = useState(false);
+
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      setIsInstallable(true);
+      console.log("PWA: beforeinstallprompt event captured");
+    };
+
+    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+
+    if (window.matchMedia("(display-mode: standalone)").matches) {
+      setIsInstallable(false);
+    }
+
+    return () => {
+      window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+    };
+  }, []);
+
+  const showInstallPrompt = async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    console.log(`PWA: User choice outcome: ${outcome}`);
+    setDeferredPrompt(null);
+    setIsInstallable(false);
+  };
+  // ──────────────────────────────────────────────────────────────
 
   const fetchProfileData = async (id: string) => {
     const { data } = await supabase
@@ -107,7 +144,15 @@ function AppContent() {
   };
 
   useEffect(() => {
+    if (activeView === 'chats') {
+      document.body.classList.add('chats-view');
+    } else {
+      document.body.classList.remove('chats-view');
+    }
+    return () => document.body.classList.remove('chats-view');
+  }, [activeView]);
 
+  useEffect(() => {
     const getSession = async () => {
       const { data } = await supabase.auth.getSession();
       if (data.session) {
@@ -296,10 +341,6 @@ function AppContent() {
   }, [userId]);
   // ──────────────────────────────────────────────────────────────
 
-  if (!isLoggedIn) {
-    return <Login onLogin={handleLogin} />;
-  }
-
   const renderContent = () => {
     switch (activeView) {
       case "home":
@@ -320,8 +361,6 @@ function AppContent() {
         return <ThemeCustomizer />;
       case "profile":
         return <ProfilePage onViewChange={handleViewChange} userId={selectedProfileId || userId} />;
-      case "notifications":
-        return <NotificationPage />;
       case "notifications":
         return <NotificationPage />;
       case "settings":
@@ -353,6 +392,7 @@ function AppContent() {
   return (
     <UserDataContext.Provider value={{ 
       avatarUrl, username, userId, 
+      isInstallable, showInstallPrompt,
       likedPostIds, savedPostIds, 
       toggleLikedPost, toggleSavedPost,
       refreshAvatar, refreshUserData, 
@@ -367,21 +407,33 @@ function AppContent() {
           fontSize: "var(--theme-font-size)",
         }}
       >
-        <Navigation activeView={activeView} onViewChange={handleViewChange} />
-        <MobileHeader onViewChange={handleViewChange} activeView={activeView} />
-        <MobileNavigation activeView={activeView} onViewChange={handleViewChange} />
-        <main className={`md:ml-64 max-w-none ${activeView === 'chats' ? 'pt-16 md:pt-0 p-0 pb-20 md:pb-0 h-screen overflow-hidden flex flex-col' : 'pt-16 pb-20 px-4 md:pt-0 md:pb-8 md:p-8'}`}>
-          {renderContent()}
-        </main>
-        <PostModal 
-          postId={selectedPostId} 
-          initialShowComments={initialShowComments}
-          onClose={() => { 
-            setSelectedPostId(null); 
-            setInitialShowComments(false);
-            handleViewChange(activeView); 
-          }} 
-        />
+        {!isLoggedIn ? (
+          <Login onLogin={handleLogin} />
+        ) : (
+          <>
+            <Navigation activeView={activeView} onViewChange={handleViewChange} />
+            <MobileHeader onViewChange={handleViewChange} activeView={activeView} />
+            <MobileNavigation activeView={activeView} onViewChange={handleViewChange} />
+            <main 
+              className={`md:ml-64 max-w-none ${activeView === 'chats' ? 'p-0 md:h-screen overflow-hidden flex flex-col' : 'pt-16 pb-20 px-4 md:pt-0 md:pb-8 md:p-8'}`}
+              style={activeView === 'chats' ? { 
+                height: window.innerWidth < 768 ? 'calc(100dvh - 128px)' : '100vh', 
+                marginTop: window.innerWidth < 768 ? '64px' : '0' 
+              } : {}}
+            >
+              {renderContent()}
+            </main>
+            <PostModal 
+              postId={selectedPostId} 
+              initialShowComments={initialShowComments}
+              onClose={() => { 
+                setSelectedPostId(null); 
+                setInitialShowComments(false);
+                handleViewChange(activeView); 
+              }} 
+            />
+          </>
+        )}
       </div>
     </UserDataContext.Provider>
   );

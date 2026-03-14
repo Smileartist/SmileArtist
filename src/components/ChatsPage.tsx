@@ -601,7 +601,7 @@ export function ChatsPage({ activeChatId, onViewChange }: ChatsPageProps) {
     };
 
     return (
-        <div className="chat-container" style={{ background: 'transparent', color: 'var(--theme-text, #fff)' }}>
+        <div className="chat-container no-scrollbar" style={{ background: 'transparent', color: 'var(--theme-text, #fff)' }}>
 
             {/* ════════ LEFT: Chat List ════════ */}
             <div className={`chat-sidebar ${currentChatId ? 'sidebar-hidden' : ''}`} style={{ background: 'transparent', flexDirection: 'column' }}>
@@ -626,7 +626,7 @@ export function ChatsPage({ activeChatId, onViewChange }: ChatsPageProps) {
                             position: 'absolute', left: '16px', right: '16px', top: '52px', zIndex: 50,
                             background: 'var(--theme-card-bg, #262626)', border: '1px solid rgba(128,128,128,0.15)',
                             borderRadius: '12px', boxShadow: '0 8px 32px rgba(0,0,0,0.25)', maxHeight: '300px', overflowY: 'auto',
-                        }}>
+                        }} className="no-scrollbar">
                             {searchingUsers ? (
                                 <div style={{ padding: '16px', textAlign: 'center', opacity: 0.5, fontSize: '13px' }}>Searching...</div>
                             ) : (
@@ -653,7 +653,7 @@ export function ChatsPage({ activeChatId, onViewChange }: ChatsPageProps) {
                 </div>
 
                 {/* Chat Items */}
-                <div style={{ flex: 1, overflowY: 'auto', paddingBottom: '80px' }}>
+                <div className="no-scrollbar" style={{ flex: 1, overflowY: 'auto', paddingBottom: '80px', scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
                     {filteredChats.length > 0 ? filteredChats.map(chat => {
                         const isActive = chat.id === currentChatId;
                         const content = chat.lastMessage?.content || "";
@@ -791,7 +791,7 @@ export function ChatsPage({ activeChatId, onViewChange }: ChatsPageProps) {
                         </div>
 
                         {/* ── Messages ── */}
-                        <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px', display: 'flex', flexDirection: 'column' }}>
+                        <div className="no-scrollbar" style={{ flex: 1, overflowY: 'auto', padding: '12px 16px', display: 'flex', flexDirection: 'column', minHeight: 0, scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
                             {/* Profile intro */}
                             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: '24px', paddingBottom: '40px' }}>
                                 {isTemporaryAnon ? <AnonAvatar size={80} /> : (
@@ -935,7 +935,7 @@ export function ChatsPage({ activeChatId, onViewChange }: ChatsPageProps) {
                         </div>
 
                         {/* ── Input Area ── */}
-                        <div style={{ padding: '8px 12px', flexShrink: 0, borderTop: '1px solid rgba(128,128,128,0.1)', paddingBottom: 'max(8px, env(safe-area-inset-bottom))', position: 'relative' }}>
+                        <div style={{ padding: '8px 12px', flexShrink: 0, borderTop: '1px solid rgba(128,128,128,0.1)', paddingBottom: '8px', position: 'relative' }}>
                             {/* Emoji Picker */}
                             {showEmojiPicker && (
                                 <div ref={emojiRef} style={{

@@ -3,7 +3,9 @@ import { Card } from "./ui/card";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { supabase } from "../utils/supabaseClient";
-import { Heart, Sparkles, BookOpen, Eye, EyeOff, AtSign, CheckCircle2, XCircle, Loader2 } from "lucide-react";
+import { Heart, Sparkles, BookOpen, Eye, EyeOff, AtSign, CheckCircle2, XCircle, Loader2, Download } from "lucide-react";
+import { useUserData } from "../App";
+import { t } from "../utils/i18n";
 
 interface LoginProps {
   onLogin: (username: string, userId: string) => void;
@@ -12,6 +14,7 @@ interface LoginProps {
 type Screen = "auth" | "choose-username";
 
 export function Login({ onLogin }: LoginProps) {
+  const { isInstallable, showInstallPrompt } = useUserData();
   const [screen, setScreen] = useState<Screen>("auth");
   const [isSignup, setIsSignup] = useState(false);
 
@@ -370,7 +373,23 @@ export function Login({ onLogin }: LoginProps) {
             </div>
           </div>
         </Card>
-
+ 
+        {isInstallable && (
+          <div className="mt-4 flex flex-col items-center animate-in fade-in slide-in-from-bottom-2 duration-700">
+            <Button 
+              onClick={showInstallPrompt}
+              variant="outline"
+              className="bg-white/50 backdrop-blur-sm border-2 border-[#d4756f]/30 hover:border-[#d4756f] hover:bg-[#fce4da]/20 text-[#2d2424] rounded-2xl h-12 px-8 flex items-center gap-2 group transition-all"
+            >
+              <Download className="w-5 h-5 text-[#d4756f] group-hover:scale-110 transition-transform" />
+              <div className="text-left">
+                <div className="text-xs font-bold uppercase tracking-wider opacity-60 leading-none mb-0.5">{t("install_app")}</div>
+                <div className="text-sm font-medium">{t("install_desc")}</div>
+              </div>
+            </Button>
+          </div>
+        )}
+ 
         <p className="text-center text-xs text-[#8a7c74] mt-4">
           A safe, supportive space for your creative expression
         </p>

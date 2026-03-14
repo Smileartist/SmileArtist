@@ -19,6 +19,7 @@ export const translations: Record<Lang, Record<string, string>> = {
     username: "Username", username_desc: "Your unique identifier on Smile Artist",
     edit: "Edit", cancel: "Cancel", save: "Save", saving: "Saving…",
     member: "Smile Artist Member", manage_desc: "Manage your account, privacy, and app preferences",
+    install_app: "Install App", install_desc: "Download the app for the best experience",
   },
   spanish: {
     home: "Inicio", search: "Buscar", trending: "Tendencias", library: "Biblioteca",
@@ -38,6 +39,7 @@ export const translations: Record<Lang, Record<string, string>> = {
     username: "Nombre de Usuario", username_desc: "Tu identificador en Smile Artist",
     edit: "Editar", cancel: "Cancelar", save: "Guardar", saving: "Guardando…",
     member: "Miembro de Smile Artist", manage_desc: "Administra tu cuenta y preferencias",
+    install_app: "Instalar App", install_desc: "Descarga la aplicación para la mejor experiencia",
   },
   french: {
     home: "Accueil", search: "Rechercher", trending: "Tendances", library: "Bibliothèque",
@@ -57,6 +59,7 @@ export const translations: Record<Lang, Record<string, string>> = {
     username: "Nom d'Utilisateur", username_desc: "Votre identifiant sur Smile Artist",
     edit: "Modifier", cancel: "Annuler", save: "Enregistrer", saving: "Enregistrement…",
     member: "Membre Smile Artist", manage_desc: "Gérez votre compte et préférences",
+    install_app: "Installer l'App", install_desc: "Téléchargez l'application pour une meilleure expérience",
   },
   german: {
     home: "Startseite", search: "Suchen", trending: "Trends", library: "Bibliothek",
@@ -76,6 +79,7 @@ export const translations: Record<Lang, Record<string, string>> = {
     username: "Benutzername", username_desc: "Dein eindeutiger Bezeichner",
     edit: "Bearbeiten", cancel: "Abbrechen", save: "Speichern", saving: "Speichern…",
     member: "Smile Artist Mitglied", manage_desc: "Konto und Einstellungen verwalten",
+    install_app: "App Installieren", install_desc: "Lade die App für das beste Erlebnis herunter",
   },
   hindi: {
     home: "होम", search: "खोज", trending: "ट्रेंडिंग", library: "पुस्तकालय",
@@ -95,6 +99,7 @@ export const translations: Record<Lang, Record<string, string>> = {
     username: "उपयोगकर्ता नाम", username_desc: "Smile Artist पर आपकी पहचान",
     edit: "संपादित करें", cancel: "रद्द करें", save: "सहेजें", saving: "सहेज रहे हैं…",
     member: "Smile Artist सदस्य", manage_desc: "खाता और प्राथमिकताएं प्रबंधित करें",
+    install_app: "ऐप इंस्टॉल करें", install_desc: "बेहतर अनुभव के लिए ऐप डाउनलोड करें",
   },
 };
 

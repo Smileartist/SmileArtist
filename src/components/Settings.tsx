@@ -11,7 +11,7 @@ import { Lang } from "../utils/i18n";
 import { toast } from "sonner";
 import {
   User, Lock, Bell, Moon, Sun, Database,
-  Trash2, Shield, UserX, LogOut, Globe,
+  Trash2, Shield, UserX, LogOut, Globe, Download
 } from "lucide-react";
 
 interface SettingsProps {
@@ -23,7 +23,7 @@ interface SettingsProps {
 
 export function Settings({ onLogout, username: usernameProp, userId, onUsernameUpdate }: SettingsProps) {
   const { updateTheme } = useTheme();
-  const { username: contextUsername, refreshUserData } = useUserData();
+  const { username: contextUsername, refreshUserData, isInstallable, showInstallPrompt } = useUserData();
   const { t, setLanguage: applyLanguage } = useLanguage();
   const username = contextUsername || usernameProp;
 
@@ -407,6 +407,22 @@ export function Settings({ onLogout, username: usernameProp, userId, onUsernameU
           </select>
         </SettingRow>
       </SettingSection>
+
+      {/* App Installation */}
+      {isInstallable && (
+        <SettingSection title={t("install_app")} icon={Download}>
+          <SettingRow label={t("install_app")} description={t("install_desc")}>
+            <Button 
+              onClick={showInstallPrompt}
+              className="rounded-xl px-6"
+              style={{ background: "linear-gradient(to right,var(--theme-primary),var(--theme-secondary))", color: "white" }}
+            >
+              <Download className="w-4 h-4 mr-2" />
+              {t("install_app")}
+            </Button>
+          </SettingRow>
+        </SettingSection>
+      )}
 
       {/* Account Actions */}
       <SettingSection title={t("account_actions")} icon={Lock}>

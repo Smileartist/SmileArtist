@@ -35,11 +35,13 @@ export function Navigation({ activeView, onViewChange }: NavigationProps) {
 
   return (
     <nav
-      className="hidden md:flex fixed left-0 top-0 h-screen w-64 border-r backdrop-blur-md p-6 flex-col shadow-lg overflow-y-auto"
+      className="hidden md:flex fixed left-0 top-0 h-screen w-64 border-r backdrop-blur-md p-6 flex-col shadow-lg overflow-y-auto no-scrollbar"
       style={{
         borderColor: 'var(--theme-primary)' + '33',
         backgroundColor: 'var(--theme-card-bg)',
         opacity: 0.95,
+        scrollbarWidth: 'none',
+        msOverflowStyle: 'none',
       }}
     >
       <div className="mb-8">
