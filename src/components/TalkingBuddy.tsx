@@ -404,12 +404,6 @@ export function TalkingBuddy() {
     // Direct insert passes OUR msgId so DB UUID === Broadcast UUID === dedup key.
     try {
       await sendBuddyMessage(sessionId, userId, textToSend, msgId);
-      if (otherUserId) {
-        try {
-            const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:8000";
-            fetch(`${apiUrl}/api/push-notify`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId: otherUserId, title: "New Message", body: "Someone sent you a message" }) }).catch(() => {});
-        } catch {}
-      }
     } catch (directErr) {
       console.error("DB persist failed:", directErr);
     }
