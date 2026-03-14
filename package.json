@@ -56,7 +56,8 @@
             "sharp": "^0.34.5",
             "sonner": "^2.0.3",
             "tailwind-merge": "*",
-            "vaul": "^1.1.2"
+            "vaul": "^1.1.2",
+            "web-push": "^3.6.7"
       },
       "devDependencies": {
             "@types/node": "^20.10.0",

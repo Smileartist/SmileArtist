@@ -1,3 +1,4 @@
+/// <reference types="vite/client" />
 import { useState, useEffect, createContext, useContext } from "react";
 import { ThemeProvider } from "./utils/ThemeContext";
 import { Navigation } from "./components/Navigation";
@@ -17,8 +18,7 @@ import { Login } from "./components/Login";
 import { Settings } from "./components/Settings";
 import { PostModal } from "./components/PostModal";
 import { PostDetail } from "./components/PostDetail";
-
-
+import { InstallPrompt } from "./components/InstallPrompt";
 import { supabase } from "./utils/supabaseClient";
 import { LanguageProvider } from "./utils/LanguageContext";
 
@@ -34,6 +34,9 @@ export const UserDataContext = createContext<{
   toggleLikedPost: (postId: string, isLiked: boolean) => void;
   toggleSavedPost: (postId: string, isSaved: boolean) => void;
   onViewChange: (view: string, targetId?: string | null, showComments?: boolean) => void;
+  deferredPrompt: any;
+  showInstallPrompt: boolean;
+  setShowInstallPrompt: (show: boolean) => void;
 }>({
   avatarUrl: null,
   username: "",
@@ -46,6 +49,9 @@ export const UserDataContext = createContext<{
   toggleLikedPost: () => { },
   toggleSavedPost: () => { },
   onViewChange: () => { },
+  deferredPrompt: null,
+  showInstallPrompt: false,
+  setShowInstallPrompt: () => { },
 });
 
 export const useUserData = () => useContext(UserDataContext);
@@ -59,6 +65,8 @@ function AppContent() {
   const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null); // New state for selected user profile
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
   const [initialShowComments, setInitialShowComments] = useState(false);
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [showInstallPrompt, setShowInstallPrompt] = useState(false);
 
   const fetchProfileData = async (id: string) => {
     const { data } = await supabase
@@ -151,6 +159,31 @@ function AppContent() {
     }
   }, []);
 
+  // ── PWA Install Logic ─────────────────────────────────────────
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: Event) => {
+      // Prevent the mini-infobar from appearing on mobile
+      e.preventDefault();
+      // Stash the event so it can be triggered later.
+      setDeferredPrompt(e);
+      
+      // Wait 5 seconds before showing our custom prompt
+      const timer = setTimeout(() => {
+        // Check if already installed
+        if (window.matchMedia('(display-mode: standalone)').matches) return;
+        setShowInstallPrompt(true);
+      }, 5000);
+
+      return () => clearTimeout(timer);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
+  }, []);
+
   const handleLogin = (usernameFromForm: string, userIdParam: string) => {
     // Set initial values from the form immediately so the UI isn't blank
     setUsername(usernameFromForm);
@@ -159,6 +192,11 @@ function AppContent() {
     // Then fetch the authoritative username from the DB (handles existing users too)
     fetchProfileData(userIdParam);
     fetchInteractions(userIdParam);
+    
+    // Automatically register for push notifications
+    notificationService.subscribeUser(userIdParam).catch(err => 
+      console.warn("Failed to subscribe user to push:", err)
+    );
   };
 
   const handleLogout = async () => {
@@ -357,7 +395,10 @@ function AppContent() {
       toggleLikedPost, toggleSavedPost,
       refreshAvatar, refreshUserData, 
       refreshInteractions: async () => { if (userId) await fetchInteractions(userId); },
-      onViewChange: handleViewChange 
+      onViewChange: handleViewChange,
+      deferredPrompt,
+      showInstallPrompt,
+      setShowInstallPrompt
     }}>
       <div
         className="min-h-screen transition-colors duration-300 overflow-x-hidden"
@@ -382,6 +423,7 @@ function AppContent() {
             handleViewChange(activeView); 
           }} 
         />
+        <InstallPrompt />
       </div>
     </UserDataContext.Provider>
   );

@@ -361,7 +361,16 @@ export function ChatsPage({ activeChatId, onViewChange }: ChatsPageProps) {
         try {
             const { error } = await supabase.rpc("send_buddy_message", { p_chat_id: currentChatId, p_user_id: userId, p_content: text });
             if (error) { setActiveMessages(prev => prev.filter(m => m.id !== optId)); }
-            else fetchChats(userId, false);
+            else {
+                fetchChats(userId, false);
+                const otherUser = activeChatData?.chat_participants.find(p => p.user_id !== userId);
+                if (otherUser) {
+                    try {
+                        const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:8000";
+                        fetch(`${apiUrl}/api/push-notify`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId: otherUser.user_id, title: "New Message", body: `${username || "Someone"}: ${text}` }) }).catch(() => {});
+                    } catch {}
+                }
+            }
         } catch { setActiveMessages(prev => prev.filter(m => m.id !== optId)); }
         finally { setSending(false); inputRef.current?.focus(); }
     };
@@ -422,7 +431,16 @@ export function ChatsPage({ activeChatId, onViewChange }: ChatsPageProps) {
                 p_chat_id: currentChatId, p_user_id: userId, p_content: `[img]${imageUrl}[/img]`
             });
             if (error) { setActiveMessages(prev => prev.filter(m => m.id !== optId)); }
-            else fetchChats(userId, false);
+            else {
+                fetchChats(userId, false);
+                const otherUser = activeChatData?.chat_participants.find(p => p.user_id !== userId);
+                if (otherUser) {
+                    try {
+                        const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:8000";
+                        fetch(`${apiUrl}/api/push-notify`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId: otherUser.user_id, title: "New Message", body: `${username || "Someone"} sent a photo` }) }).catch(() => {});
+                    } catch {}
+                }
+            }
         } catch { setActiveMessages(prev => prev.filter(m => m.id !== optId)); }
     };
 

@@ -3,9 +3,27 @@ import cors from "cors";
 import bodyParser from "body-parser";
 import OpenAI from "openai";
 import dotenv from "dotenv";
+import webpush from "web-push";
+import { createClient } from "@supabase/supabase-js";
 
 // Load environment variables from .env file
 dotenv.config();
+
+// Initialize Supabase (Service Role Key recommended for backend, but we'll use Anon for now or assume Service Role is in ENV)
+const supabaseUrl = process.env.VITE_SUPABASE_URL;
+const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY; // Ideally use SERVICE_ROLE_KEY for server-side
+const supabase = createClient(supabaseUrl, supabaseKey);
+
+// Configure web-push
+if (process.env.VITE_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
+  webpush.setVapidDetails(
+    process.env.VAPID_SUBJECT || "mailto:support@smileartist.com",
+    process.env.VITE_VAPID_PUBLIC_KEY,
+    process.env.VAPID_PRIVATE_KEY
+  );
+} else {
+  console.warn("VAPID keys are missing. Push notifications will not work.");
+}
 
 const app = express();
 app.use(cors());
@@ -61,6 +79,55 @@ app.post("/api/analyze", async (req, res) => {
   } catch (e) {
     console.error("Analysis error:", e);
     res.status(500).json({ error: e.message || "Analysis failed. Please try again." });
+  }
+});
+
+app.post("/api/push-notify", async (req, res) => {
+  const { userId, title, body, data } = req.body;
+
+  if (!userId || !title || !body) {
+    return res.status(400).json({ error: "Missing required fields: userId, title, body" });
+  }
+
+  try {
+    // Fetch user's subscriptions
+    const { data: subscriptions, error } = await supabase
+      .from("push_subscriptions")
+      .select("subscription_json")
+      .eq("user_id", userId);
+
+    if (error) throw error;
+
+    if (!subscriptions || subscriptions.length === 0) {
+      return res.json({ success: true, message: "No subscriptions found for user" });
+    }
+
+    const payload = JSON.stringify({ title, body, ...data });
+
+    const sendPromises = subscriptions.map(async (sub) => {
+      const pushSubscription = JSON.parse(sub.subscription_json);
+      try {
+        await webpush.sendNotification(pushSubscription, payload);
+      } catch (err) {
+        if (err.statusCode === 404 || err.statusCode === 410) {
+          // Subscription has expired or is no longer valid, remove it
+          await supabase
+            .from("push_subscriptions")
+            .delete()
+            .eq("user_id", userId)
+            .eq("subscription_json", sub.subscription_json);
+        } else {
+          console.error("Error sending push notification:", err);
+        }
+      }
+    });
+
+    await Promise.all(sendPromises);
+
+    res.json({ success: true, message: `Attempted to send push to ${subscriptions.length} devices.` });
+  } catch (e) {
+    console.error("Push notify error:", e);
+    res.status(500).json({ error: "Failed to send push notifications" });
   }
 });
 
