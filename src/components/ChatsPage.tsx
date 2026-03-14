@@ -531,8 +531,15 @@ export function ChatsPage({ activeChatId, onViewChange }: ChatsPageProps) {
 
     if (initialLoading) {
         return (
-            <div className="chat-container" style={{ alignItems: 'center', justifyContent: 'center', background: 'var(--theme-background, #000)' }}>
-                <p style={{ color: '#888' }}>Loading chats...</p>
+            <div className="chat-container" style={{ 
+                background: 'linear-gradient(to bottom right, var(--theme-background), var(--theme-accent), var(--theme-accent))',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+            }}>
+                <div className="animate-pulse" style={{ color: 'var(--theme-primary)', fontWeight: 600 }}>
+                    Initializing Chats...
+                </div>
             </div>
         );
     }

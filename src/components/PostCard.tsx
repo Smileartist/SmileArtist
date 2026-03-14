@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Heart, MessageCircle, Bookmark, MoreHorizontal, Send, Link2, Flag, User, Share2, Trash2 } from "lucide-react";
+import { Heart, MessageCircle, Bookmark, MoreHorizontal, Send, Link2, Flag, User, Share2, Trash2, X } from "lucide-react";
 import { Card } from "./ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import {
@@ -10,7 +10,7 @@ import {
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
 import { supabase } from "../utils/supabaseClient";
-import { CommentModal } from "./CommentModal";
+import { CommentSection } from "./CommentSection";
 import { ShareModal } from "./ShareModal";
 import { handleLike as handleLikeUtil, handleSave as handleSaveUtil } from "../utils/postInteractions";
 import { Post } from "../utils/supabaseQueries";
@@ -20,14 +20,25 @@ import { toast } from "sonner";
 interface PostCardProps {
   post: Post;
   onDelete?: (postId: string) => void;
+  onCommentToggle?: () => void;
+  hideActions?: boolean;
+  initialCommentsExpanded?: boolean;
+  layout?: 'feed' | 'modal';
 }
 
-export function PostCard({ post, onDelete }: PostCardProps) {
+export function PostCard({ 
+  post, 
+  onDelete, 
+  onCommentToggle, 
+  hideActions = false, 
+  initialCommentsExpanded = false,
+  layout = 'feed'
+}: PostCardProps) {
   const { onViewChange, userId: currentUserId, likedPostIds, savedPostIds, toggleLikedPost, toggleSavedPost } = useUserData();
   const { postId, author, content, title, likes, comments: initialComments, created_at: timestamp, category, user_id } = post;
 
   const [likeCount, setLikeCount] = useState(likes || 0);
-  const [showCommentModal, setShowCommentModal] = useState(false);
+  const [showComments, setShowComments] = useState(initialCommentsExpanded);
   const [showShareModal, setShowShareModal] = useState(false);
   const [commentCount, setCommentCount] = useState(initialComments);
 
@@ -127,7 +138,16 @@ export function PostCard({ post, onDelete }: PostCardProps) {
   };
 
   return (
-    <Card id={`post-${postId}`} className="p-4 md:p-6" style={{ background: 'var(--theme-card-bg)', borderRadius: '24px' }}>
+    <Card 
+      id={`post-${postId}`} 
+      className={onCommentToggle ? "p-6 md:p-8 border-none shadow-none" : "p-4 md:p-6"} 
+      style={{ 
+        background: onCommentToggle ? 'transparent' : 'var(--theme-card-bg)', 
+        borderRadius: onCommentToggle ? '0' : '24px',
+        width: '100%',
+        boxSizing: 'border-box'
+      }}
+    >
       <div className="flex items-start justify-between mb-4">
         <button
           onClick={handleAuthorClick}
@@ -187,9 +207,9 @@ export function PostCard({ post, onDelete }: PostCardProps) {
         </DropdownMenu>
       </div>
 
-      {title && <h3 className="mb-3">{title}</h3>}
+      {title && <h3 className={onCommentToggle ? "mb-4 text-xl md:text-2xl font-bold" : "mb-3"}>{title}</h3>}
 
-      <div className="mb-4 whitespace-pre-line italic opacity-80">
+      <div className={onCommentToggle ? "mb-6 whitespace-pre-line italic opacity-90 text-[16px] md:text-lg leading-relaxed" : "mb-4 whitespace-pre-line italic opacity-80"}>
         {content}
       </div>
 
@@ -203,17 +223,25 @@ export function PostCard({ post, onDelete }: PostCardProps) {
           <span>{likeCount}</span>
         </button>
 
-        <button onClick={() => setShowCommentModal(true)} className="flex items-center gap-2 opacity-70">
+        <button 
+          onClick={() => {
+            if (onCommentToggle) onCommentToggle();
+            else setShowComments(!showComments);
+          }} 
+          className="flex items-center gap-2 opacity-70 hover:opacity-100 transition-opacity"
+        >
           <MessageCircle className="w-5 h-5" />
           <span>{commentCount}</span>
         </button>
 
-        <button
-          onClick={() => setShowShareModal(true)}
-          className="flex items-center gap-2 opacity-70 hover:opacity-100 transition-opacity"
-        >
-          <Send className="w-5 h-5" />
-        </button>
+        {!hideActions && (
+          <button
+            onClick={() => setShowShareModal(true)}
+            className="flex items-center gap-2 opacity-70 hover:opacity-100 transition-opacity"
+          >
+            <Send className="w-5 h-5" />
+          </button>
+        )}
 
         <button onClick={handleSave} className="ml-auto">
           <Bookmark
@@ -224,12 +252,33 @@ export function PostCard({ post, onDelete }: PostCardProps) {
         </button>
       </div>
 
-      <CommentModal
-        postId={postId}
-        isOpen={showCommentModal}
-        onClose={() => setShowCommentModal(false)}
-        onCommentAdded={handleCommentAdded}
-      />
+      {/* Inline/Integrated Comments Extension */}
+      {showComments && (
+        <div className={`mt-4 ${layout === 'modal' ? 'lg:mt-0 lg:border-l lg:border-t-0' : 'border-t'}`} style={{ borderColor: 'var(--theme-text)10', flex: layout === 'modal' ? '1.5' : 'none' }}>
+          <div className={`py-4 ${layout === 'modal' ? 'lg:py-0 lg:h-full lg:flex lg:flex-col' : ''}`}>
+            <div className="flex items-center justify-between px-4 py-2 border-b lg:border-none" style={{ borderColor: 'var(--theme-text)05' }}>
+              <h4 className="text-sm font-bold opacity-60">Comments</h4>
+              <button 
+                onClick={() => {
+                  if (layout === 'modal') onCommentToggle?.();
+                  else setShowComments(false);
+                }} 
+                className="p-1 hover:bg-black/5 rounded-full transition-colors"
+              >
+                <X size={16} className="opacity-40" />
+              </button>
+            </div>
+            <div className={layout === 'modal' ? 'lg:flex-1 lg:overflow-hidden' : ''}>
+              <CommentSection
+                postId={postId}
+                postAuthorId={user_id}
+                onCommentAdded={handleCommentAdded}
+                maxHeight={layout === 'modal' ? "none" : "500px"}
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       <ShareModal
         postId={postId}

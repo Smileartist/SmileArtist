@@ -12,6 +12,7 @@ import { Textarea } from "./ui/textarea";
 import { supabase } from "../utils/supabaseClient";
 import { ensureUserExists } from "../utils/ensureUserExists";
 import { toast } from "sonner";
+import { PostModal } from "./PostModal";
 import { Checkbox } from "./ui/checkbox";
 
 interface ProfilePageProps {
@@ -1215,58 +1216,11 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
         </Tabs>
       </div>
 
-      {/* ── Full-post modal rendered via portal so fixed positioning is always relative to viewport ── */}
-      {selectedPost && createPortal(
-        <div
-          style={{
-            position: 'fixed', inset: 0, zIndex: 9999,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            padding: '16px',
-            backgroundColor: 'rgba(0,0,0,0.75)',
-            backdropFilter: 'blur(4px)',
-          }}
-          onClick={() => setSelectedPost(null)}
-        >
-          <div
-            style={{
-              position: 'relative',
-              width: '100%',
-              maxWidth: '560px',
-              maxHeight: '90vh',
-              overflowY: 'auto',
-              borderRadius: '24px',
-              boxShadow: '0 25px 60px rgba(0,0,0,0.3)',
-              backgroundColor: 'var(--theme-card-bg)',
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Close button */}
-            <button
-              onClick={() => setSelectedPost(null)}
-              style={{
-                position: 'absolute', top: '12px', right: '12px', zIndex: 10,
-                width: '32px', height: '32px',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                borderRadius: '50%', border: 'none', cursor: 'pointer',
-                backgroundColor: 'var(--theme-accent)', color: 'var(--theme-primary)',
-              }}
-              aria-label="Close"
-            >
-              <X size={16} />
-            </button>
-
-            <div style={{ padding: '8px' }}>
-              <PostCard
-                post={selectedPost}
-                onDelete={(deletedId) => {
-                  setUserPosts(prev => prev.filter(p => p.postId !== deletedId));
-                  setSelectedPost(null);
-                }}
-              />
-            </div>
-          </div>
-        </div>,
-        document.body
+      {selectedPost && (
+        <PostModal 
+          postId={selectedPost.postId} 
+          onClose={() => setSelectedPost(null)} 
+        />
       )}
     </div>
   );

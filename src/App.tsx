@@ -33,7 +33,7 @@ export const UserDataContext = createContext<{
   refreshInteractions: () => Promise<void>;
   toggleLikedPost: (postId: string, isLiked: boolean) => void;
   toggleSavedPost: (postId: string, isSaved: boolean) => void;
-  onViewChange: (view: string, userId?: string | null) => void;
+  onViewChange: (view: string, targetId?: string | null, showComments?: boolean) => void;
 }>({
   avatarUrl: null,
   username: "",
@@ -58,6 +58,7 @@ function AppContent() {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null); // New state for selected user profile
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
+  const [initialShowComments, setInitialShowComments] = useState(false);
 
   const fetchProfileData = async (id: string) => {
     const { data } = await supabase
@@ -193,10 +194,12 @@ function AppContent() {
         setSelectedPostId(null);
       } else if (view === 'post') {
         setSelectedPostId(targetId);
+        setInitialShowComments(params.get('comments') === 'true');
       } else {
         setSelectedProfileId(null);
         setActiveChatId(null);
         setSelectedPostId(null);
+        setInitialShowComments(false);
       }
       setActiveView(view === 'post' ? 'home' : view);
     };
@@ -221,12 +224,14 @@ function AppContent() {
       setSelectedPostId(null);
     } else if (view === "post") {
       setSelectedPostId(targetId);
+      setInitialShowComments(!!arguments[2]); // Third argument is showComments
       // Keep the activeView the same or switch to home if it was nothing
       if (!activeView) setActiveView('home');
     } else {
       setSelectedProfileId(null); // Clear selected user when navigating away from profile
       setActiveChatId(null);
       setSelectedPostId(null);
+      setInitialShowComments(false);
     }
     if (view !== 'post') setActiveView(view);
 
@@ -365,10 +370,18 @@ function AppContent() {
         <Navigation activeView={activeView} onViewChange={handleViewChange} />
         <MobileHeader onViewChange={handleViewChange} activeView={activeView} />
         <MobileNavigation activeView={activeView} onViewChange={handleViewChange} />
-        <main className={`md:ml-64 max-w-none ${activeView === 'chats' ? 'pt-16 md:pt-0 p-0 pb-20 md:pb-0 h-screen overflow-hidden flex flex-col' : 'pt-16 pb-20 px-0 md:pt-0 md:pb-8 md:p-8'}`}>
+        <main className={`md:ml-64 max-w-none ${activeView === 'chats' ? 'pt-16 md:pt-0 p-0 pb-20 md:pb-0 h-screen overflow-hidden flex flex-col' : 'pt-16 pb-20 px-4 md:pt-0 md:pb-8 md:p-8'}`}>
           {renderContent()}
         </main>
-        <PostModal postId={selectedPostId} onClose={() => { setSelectedPostId(null); handleViewChange(activeView); }} />
+        <PostModal 
+          postId={selectedPostId} 
+          initialShowComments={initialShowComments}
+          onClose={() => { 
+            setSelectedPostId(null); 
+            setInitialShowComments(false);
+            handleViewChange(activeView); 
+          }} 
+        />
       </div>
     </UserDataContext.Provider>
   );

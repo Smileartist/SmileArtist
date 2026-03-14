@@ -1,18 +1,43 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { PostCard } from "./PostCard";
 import { supabase } from "../utils/supabaseClient";
 import { Post } from "../utils/supabaseQueries";
+import { CommentSection } from "./CommentModal";
 
 interface PostModalProps {
   postId: string | null;
+  initialShowComments?: boolean;
   onClose: () => void;
 }
 
-export function PostModal({ postId, onClose }: PostModalProps) {
+export function PostModal({ postId, initialShowComments = false, onClose }: PostModalProps) {
   const [post, setPost] = useState<Post | null>(null);
   const [loading, setLoading] = useState(false);
+  const [showComments, setShowComments] = useState(false);
+  const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 1024);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleResize = () => setIsDesktop(window.innerWidth >= 1024);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  // Body/HTML scroll lock
+  useEffect(() => {
+    if (postId) {
+      const originalBodyOverflow = document.body.style.overflow;
+      const originalHtmlOverflow = document.documentElement.style.overflow;
+      document.body.style.overflow = "hidden";
+      document.documentElement.style.overflow = "hidden";
+      return () => {
+        document.body.style.overflow = originalBodyOverflow;
+        document.documentElement.style.overflow = originalHtmlOverflow;
+      };
+    }
+  }, [postId]);
 
   useEffect(() => {
     const fetchPost = async () => {
@@ -69,62 +94,93 @@ export function PostModal({ postId, onClose }: PostModalProps) {
       }
     };
 
-    fetchPost();
+    if (postId) {
+      fetchPost();
+      setShowComments(initialShowComments);
+    }
   }, [postId]);
+
+  useEffect(() => {
+    if (showComments && !isDesktop && scrollContainerRef.current) {
+      setTimeout(() => {
+        // Find the newly rendered comments division inside the postcard and scroll to it if needed
+        const commentsEl = scrollContainerRef.current?.querySelector('.mt-4.border-t');
+        commentsEl?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 100);
+    }
+  }, [showComments, isDesktop]);
 
   if (!postId) return null;
 
   return createPortal(
     <div
       style={{
-        position: 'fixed', inset: 0, zIndex: 9999,
+        position: 'fixed', inset: 0, zIndex: 10100,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        padding: '16px',
-        backgroundColor: 'rgba(0,0,0,0.75)',
-        backdropFilter: 'blur(4px)',
+        padding: isDesktop ? '24px' : '16px', // Added 16px padding on mobile to prevent overflow
+        backgroundColor: 'rgba(0,0,0,0.85)',
+        backdropFilter: 'blur(8px)',
       }}
       onClick={onClose}
     >
+      {/* Main Close button on overlay */}
+      <button
+        onClick={onClose}
+        style={{
+          position: 'fixed', top: '24px', right: '24px', zIndex: 10200,
+          width: '40px', height: '40px',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          borderRadius: '50%', 
+          cursor: 'pointer',
+          backgroundColor: 'rgba(255,255,255,0.1)', 
+          color: 'white',
+          backdropFilter: 'blur(10px)',
+          border: '1px solid rgba(255,255,255,0.2)',
+        }}
+        aria-label="Close Modal"
+      >
+        <X size={20} />
+      </button>
+
       <div
+        ref={scrollContainerRef}
         style={{
           position: 'relative',
           width: '100%',
-          maxWidth: '560px',
-          maxHeight: '90vh',
+          maxWidth: showComments && isDesktop ? '1000px' : '560px',
+          maxHeight: isDesktop ? '92vh' : '85vh',
+          display: 'flex',
+          flexDirection: isDesktop ? 'row' : 'column',
           overflowY: 'auto',
+          overflowX: 'hidden',
           borderRadius: '24px',
-          boxShadow: '0 25px 60px rgba(0,0,0,0.3)',
+          boxShadow: '0 25px 60px rgba(0,0,0,0.5)',
           backgroundColor: 'var(--theme-card-bg)',
+          transition: 'max-width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Close button */}
-        <button
-          onClick={onClose}
-          style={{
-            position: 'absolute', top: '12px', right: '12px', zIndex: 10,
-            width: '32px', height: '32px',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            borderRadius: '50%', border: 'none', cursor: 'pointer',
-            backgroundColor: 'var(--theme-accent)', color: 'var(--theme-primary)',
-          }}
-          aria-label="Close"
-        >
-          <X size={16} />
-        </button>
-
-        <div style={{ padding: '8px' }}>
-          {loading ? (
-            <div style={{ padding: '40px', textAlign: 'center', color: 'var(--theme-text)', opacity: 0.6 }}>
-              <div className="animate-pulse">Loading post details...</div>
-            </div>
-          ) : post ? (
-            <PostCard post={post} />
-          ) : (
-            <div style={{ padding: '40px', textAlign: 'center', color: 'var(--theme-text)', opacity: 0.6 }}>
-              Post not found.
-            </div>
-          )}
+        <div style={{ 
+          width: '100%'
+        }}>
+          <div style={{ padding: '0' }}>
+            {loading ? (
+              <div style={{ padding: '60px', textAlign: 'center', color: 'var(--theme-text)', opacity: 0.6 }}>
+                <div className="animate-pulse">Loading post details...</div>
+              </div>
+            ) : post ? (
+              <PostCard 
+                post={post} 
+                initialCommentsExpanded={showComments}
+                onCommentToggle={() => setShowComments(!showComments)}
+                layout={isDesktop && showComments ? 'modal' : 'feed'}
+              />
+            ) : (
+              <div style={{ padding: '60px', textAlign: 'center', color: 'var(--theme-text)', opacity: 0.6 }}>
+                Post not found.
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>,
