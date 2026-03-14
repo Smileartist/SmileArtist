@@ -843,8 +843,8 @@ export function ChatsPage({ activeChatId, onViewChange }: ChatsPageProps) {
                                         ) : parsed.sharedPost ? (
                                             <div 
                                                 onClick={() => {
-                                                    // Standard deep-link to post
-                                                    window.location.href = `/?post=${parsed.sharedPost!.id}`;
+                                                    // Use internal navigation to prevent PWA browser leaks
+                                                    onViewChange?.('post', parsed.sharedPost!.id);
                                                 }}
                                                 style={{
                                                     width: '240px',

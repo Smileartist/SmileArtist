@@ -48,26 +48,27 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
   const [editMotivatorTitle, setEditMotivatorTitle] = useState("");
   const [editMotivatorBio, setEditMotivatorBio] = useState("");
 
-  const fetchFollowData = async (currId: string | null) => {
-    if (!targetUuid) return;
+  const fetchFollowData = async (currId: string | null, targetIdInput?: string) => {
+    const activeTargetId = targetIdInput || targetUuid;
+    if (!activeTargetId) return;
     const { count: followers } = await supabase
       .from("follows")
       .select("*", { count: "exact", head: true })
-      .eq("following_id", targetUuid);
+      .eq("following_id", activeTargetId);
     setFollowerCount(followers ?? 0);
 
-    // Fetch following count - how many people this user follows
+    // Fetch following count
     const { count: following } = await supabase
       .from("follows")
       .select("*", { count: "exact", head: true })
-      .eq("follower_id", targetUuid);
+      .eq("follower_id", activeTargetId);
     setFollowingCount(following ?? 0);
 
     // Fetch the actual followers list for the tab
     const { data: followersData } = await supabase
       .from("follows")
       .select("follower_id")
-      .eq("following_id", targetUuid);
+      .eq("following_id", activeTargetId);
       
     if (followersData && followersData.length > 0) {
       const followerIds = followersData.map(f => f.follower_id);
@@ -80,17 +81,17 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
       setFollowersList([]);
     }
 
-    if (!currId || currId === targetUuid) {
+    if (!currId || currId === activeTargetId) {
       setIsFollowing(false);
       return;
     }
     
-    if (currId && currId !== targetUuid) {
+    if (currId && currId !== activeTargetId) {
       const { data } = await supabase
         .from("follows")
         .select("follower_id")
         .eq("follower_id", currId)
-        .eq("following_id", targetUuid)
+        .eq("following_id", activeTargetId)
         .maybeSingle();
       setIsFollowing(!!data);
     }
@@ -116,7 +117,7 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
         setFollowerCount(c => c + 1);
         // Send follow notification
         await ensureUserExists(currentUserId);
-        await ensureUserExists(targetUuid);
+        if (targetUuid) await ensureUserExists(targetUuid);
         await supabase.from("notifications").insert({
           recipient_id: targetUuid,
           sender_id: currentUserId,
@@ -169,6 +170,10 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
         }
         
         setTargetUuid(resolvedId);
+        if (resolvedId && currentUserId) {
+          checkBuddyStatus(resolvedId);
+          fetchFollowData(currentUserId, resolvedId);
+        }
 
         // Now fetch full profile data using resolvedId
         const { data: profile, error: profileError } = await supabase
@@ -253,12 +258,16 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
     }
   }, [targetUuid, currentUserId]);
 
+  // Removed redundant buddy/follow effect as it is now handled in resolveAndFetch and on login
+  
   useEffect(() => {
-    if (targetUuid && currentUserId && targetUuid !== currentUserId) {
+    if (currentUserId && targetUuid && currentUserId !== targetUuid) {
       checkBuddyStatus();
       fetchFollowData(currentUserId);
+    } else if (targetUuid && currentUserId === targetUuid) {
+      setBuddyStatus(null);
     }
-  }, [targetUuid, currentUserId]);
+  }, [currentUserId, targetUuid]); // re-run if target user or current user changes
 
   const isOwnProfile = currentUserId === targetUuid;
 
@@ -307,15 +316,24 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
   const [buddyRequestId, setBuddyRequestId] = useState<string | null>(null);
   const [buddyLoading, setBuddyLoading] = useState(false);
 
-  const checkBuddyStatus = async () => {
-    if (!currentUserId || !targetUuid || currentUserId === targetUuid) return;
-    const { data } = await supabase
+  const checkBuddyStatus = async (targetIdInput?: string) => {
+    const activeTargetId = targetIdInput || targetUuid;
+    if (!currentUserId || !activeTargetId || currentUserId === activeTargetId) return;
+    const { data: results } = await supabase
       .from('buddy_requests')
       .select('id, status, from_user, to_user')
-      .or(`and(from_user.eq.${currentUserId},to_user.eq.${targetUuid}),and(from_user.eq.${targetUuid},to_user.eq.${currentUserId})`)
-      .maybeSingle();
+      .or(`and(from_user.eq.${currentUserId},to_user.eq.${activeTargetId}),and(from_user.eq.${activeTargetId},to_user.eq.${currentUserId})`);
 
-    if (!data) { setBuddyStatus(null); setBuddyRequestId(null); return; }
+    if (!results || results.length === 0) { 
+      setBuddyStatus(null); 
+      setBuddyRequestId(null); 
+      return; 
+    }
+
+    // Prioritize 'accepted' status if multiple exist
+    const acceptedRequest = results.find(r => r.status === 'accepted');
+    const data = acceptedRequest || results[0];
+
     setBuddyRequestId(data.id);
     if (data.status === 'accepted') setBuddyStatus('accepted');
     else if (data.from_user === currentUserId) setBuddyStatus('pending_sent');
@@ -343,7 +361,7 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
 
       // Notify receiver
       await ensureUserExists(currentUserId);
-      await ensureUserExists(targetUuid);
+      if (targetUuid) await ensureUserExists(targetUuid);
       await supabase.from('notifications').insert({
         recipient_id: targetUuid,
         sender_id: currentUserId,
@@ -701,17 +719,23 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
                       </Button>
                     )}
                     {buddyStatus === 'accepted' && (
-                      <Button 
-                        variant="outline" 
-                        className="rounded-xl group hover:border-red-500 hover:text-red-500 hover:bg-red-50" 
-                        style={{ borderColor: 'var(--theme-primary)', color: 'var(--theme-primary)' }}
-                        onClick={() => removeBuddy(targetUuid)}
-                      >
-                        <UserCheck className="w-4 h-4 mr-2 group-hover:hidden" />
-                        <Trash2 className="w-4 h-4 mr-2 hidden group-hover:block" />
-                        <span className="group-hover:hidden">Buddies ✓</span>
-                        <span className="hidden group-hover:block">Remove Buddy</span>
-                      </Button>
+                      <div className="flex items-center gap-2">
+                        <Badge 
+                          className="rounded-xl px-4 py-2 flex items-center gap-2 bg-[var(--theme-accent)] text-[var(--theme-primary)] border border-[var(--theme-primary)]/20 shadow-sm"
+                        >
+                          <Smile className="w-4 h-4" />
+                          <span className="font-bold">YOUR BUDDY</span>
+                        </Badge>
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          className="rounded-xl opacity-30 hover:opacity-100 hover:text-red-500 transition-opacity" 
+                          onClick={() => targetUuid && removeBuddy(targetUuid)}
+                          title="Remove Buddy"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
                     )}
                     {/* Send Message Button — visible on other profiles */}
                     <Button
@@ -797,10 +821,12 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
                     <strong>{profileUser.stats.posts}</strong>{" Posts"}
                   </span>
                   <span style={{ color: 'var(--theme-text)' }}>
-                    <strong>{followerCount}</strong>{" Followers"}
+                    <strong>{followerCount}</strong>{" "}
+                    {followerCount === 1 ? "Follower" : "Followers"}
                   </span>
                   <span style={{ color: 'var(--theme-text)' }}>
-                    <strong>{buddyCount}</strong>{" Buddies"}
+                    <strong>{buddyCount}</strong>{" "}
+                    {buddyCount === 1 ? "Buddy" : "Buddies"}
                   </span>
                 </div>
               </>

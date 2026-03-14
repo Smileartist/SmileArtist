@@ -81,7 +81,7 @@ export function PostCard({ post, onDelete }: PostCardProps) {
   };
 
   const handleCopyLink = () => {
-    const url = `${window.location.origin}?post=${postId}`;
+    const url = `${window.location.origin}?view=post&targetId=${postId}`;
     navigator.clipboard.writeText(url).then(() => {
       toast.success("Link copied to clipboard!");
     });
@@ -127,7 +127,7 @@ export function PostCard({ post, onDelete }: PostCardProps) {
   };
 
   return (
-    <Card className="p-4 md:p-6">
+    <Card id={`post-${postId}`} className="p-4 md:p-6" style={{ background: 'var(--theme-card-bg)', borderRadius: '24px' }}>
       <div className="flex items-start justify-between mb-4">
         <button
           onClick={handleAuthorClick}

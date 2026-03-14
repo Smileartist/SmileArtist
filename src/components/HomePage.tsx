@@ -3,10 +3,19 @@ import { PostCard } from "./PostCard";
 import { supabase } from "../utils/supabaseClient";
 import { BookOpen, Users } from "lucide-react";
 
-export function HomePage() {
+export function HomePage({ targetPostId }: { targetPostId?: string | null }) {
   const [followedPosts, setFollowedPosts] = useState<any[]>([]);
   const [otherPosts, setOtherPosts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!loading && targetPostId) {
+      setTimeout(() => {
+        const el = document.getElementById(`post-${targetPostId}`);
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 500);
+    }
+  }, [loading, targetPostId]);
 
   useEffect(() => {
     const fetchPosts = async () => {

@@ -15,6 +15,8 @@ import { LibraryPage } from "./components/LibraryPage";
 import { WritePost } from "./components/WritePost";
 import { Login } from "./components/Login";
 import { Settings } from "./components/Settings";
+import { PostModal } from "./components/PostModal";
+import { PostDetail } from "./components/PostDetail";
 
 
 import { supabase } from "./utils/supabaseClient";
@@ -55,6 +57,7 @@ function AppContent() {
   const [userId, setUserId] = useState("");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null); // New state for selected user profile
+  const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
 
   const fetchProfileData = async (id: string) => {
     const { data } = await supabase
@@ -183,14 +186,19 @@ function AppContent() {
       if (view === 'profile') {
         setSelectedProfileId(targetId);
         setActiveChatId(null);
+        setSelectedPostId(null);
       } else if (view === 'chats') {
         setActiveChatId(targetId);
         setSelectedProfileId(null);
+        setSelectedPostId(null);
+      } else if (view === 'post') {
+        setSelectedPostId(targetId);
       } else {
         setSelectedProfileId(null);
         setActiveChatId(null);
+        setSelectedPostId(null);
       }
-      setActiveView(view);
+      setActiveView(view === 'post' ? 'home' : view);
     };
 
     // Run once on mount to grab initial URL state
@@ -206,26 +214,33 @@ function AppContent() {
     if (view === "profile") {
       setSelectedProfileId(targetId);
       setActiveChatId(null);
+      setSelectedPostId(null);
     } else if (view === "chats") {
       setActiveChatId(targetId);
       setSelectedProfileId(null);
+      setSelectedPostId(null);
+    } else if (view === "post") {
+      setSelectedPostId(targetId);
+      // Keep the activeView the same or switch to home if it was nothing
+      if (!activeView) setActiveView('home');
     } else {
       setSelectedProfileId(null); // Clear selected user when navigating away from profile
       setActiveChatId(null);
+      setSelectedPostId(null);
     }
-    setActiveView(view);
+    if (view !== 'post') setActiveView(view);
 
     // Sync to URL
-    const url = new URL(window.location.href);
-    url.searchParams.set('view', view);
+    const searchParams = new URLSearchParams();
+    searchParams.set('view', view);
     if (targetId) {
-      url.searchParams.set('targetId', targetId);
-    } else {
-      url.searchParams.delete('targetId');
+      searchParams.set('targetId', targetId);
     }
+    
+    const newSearch = `?${searchParams.toString()}`;
     // Only push state if the URL actually changed to prevent duplicate history entries
-    if (window.location.search !== url.search) {
-      window.history.pushState({ view, targetId }, '', url.toString());
+    if (window.location.search !== newSearch) {
+      window.history.pushState({ view, targetId }, '', newSearch);
     }
   };
 
@@ -302,6 +317,8 @@ function AppContent() {
         return <ProfilePage onViewChange={handleViewChange} userId={selectedProfileId || userId} />;
       case "notifications":
         return <NotificationPage />;
+      case "notifications":
+        return <NotificationPage />;
       case "settings":
         return (
           <Settings
@@ -312,7 +329,8 @@ function AppContent() {
           />
         );
       default:
-        return <HomePage />;
+        // Pass the targetId (from URL) to HomePage to allow highlighting/scrolling to a post
+        return <HomePage targetPostId={activeView === 'home' ? activeChatId : null} />;
     }
   };
 
@@ -337,7 +355,7 @@ function AppContent() {
       onViewChange: handleViewChange 
     }}>
       <div
-        className="min-h-screen transition-colors duration-300"
+        className="min-h-screen transition-colors duration-300 overflow-x-hidden"
         style={{
           background: `linear-gradient(to bottom right, var(--theme-background), var(--theme-accent), var(--theme-accent)) `,
           fontFamily: "var(--theme-font-family)",
@@ -347,9 +365,10 @@ function AppContent() {
         <Navigation activeView={activeView} onViewChange={handleViewChange} />
         <MobileHeader onViewChange={handleViewChange} activeView={activeView} />
         <MobileNavigation activeView={activeView} onViewChange={handleViewChange} />
-        <main className="md:ml-64 pt-16 pb-20 px-4 md:pt-0 md:pb-8 md:p-8">
+        <main className={`md:ml-64 max-w-none ${activeView === 'chats' ? 'pt-16 md:pt-0 p-0 h-screen overflow-hidden' : 'pt-16 pb-20 px-0 md:pt-0 md:pb-8 md:p-8'}`}>
           {renderContent()}
         </main>
+        <PostModal postId={selectedPostId} onClose={() => { setSelectedPostId(null); handleViewChange(activeView); }} />
       </div>
     </UserDataContext.Provider>
   );
