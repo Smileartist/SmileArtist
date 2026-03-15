@@ -44,7 +44,7 @@ export function MobileHeader({ onMenuClick, onViewChange, activeView }: MobileHe
           <img
             src={logo}
             alt="Smile Artist"
-            className="h-12 object-contain"
+            className="h-12 object-contain dark:invert transition-all duration-300"
           />
         </div>
         <div className="flex items-center gap-2 justify-self-end">

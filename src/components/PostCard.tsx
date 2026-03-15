@@ -207,7 +207,14 @@ export function PostCard({
         </DropdownMenu>
       </div>
 
-      {title && <h3 className={onCommentToggle ? "mb-4 text-xl md:text-2xl font-bold" : "mb-3"}>{title}</h3>}
+      {title && (
+        <h3 
+          className="mb-4 text-2xl md:text-3xl font-extrabold tracking-tight" 
+          style={{ color: "var(--theme-text)", lineHeight: "1.2" }}
+        >
+          {title}
+        </h3>
+      )}
 
       <div className={onCommentToggle ? "mb-6 whitespace-pre-line italic opacity-90 text-[16px] md:text-lg leading-relaxed" : "mb-4 whitespace-pre-line italic opacity-80"}>
         {content}

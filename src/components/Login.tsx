@@ -175,7 +175,7 @@ export function Login({ onLogin }: LoginProps) {
           <div className="text-center mb-8">
             <div className="flex items-center justify-center gap-2 mb-3">
               <Heart className="w-8 h-8 text-[#d4756f]" />
-              <h1 className="text-[#2d2424] text-3xl">Smile Artist</h1>
+              <h1 className="text-[#2d2424] dark:text-[#f5e8e0] text-3xl transition-colors duration-300">Smile Artist</h1>
             </div>
             <p className="text-[#8a7c74]">One last step — choose your username</p>
           </div>
@@ -248,7 +248,7 @@ export function Login({ onLogin }: LoginProps) {
         <div className="text-center mb-8">
           <div className="flex items-center justify-center gap-2 mb-3">
             <Heart className="w-8 h-8 text-[#d4756f]" />
-            <h1 className="text-[#2d2424] text-3xl">Smile Artist</h1>
+            <h1 className="text-[#2d2424] dark:text-[#f5e8e0] text-3xl transition-colors duration-300">Smile Artist</h1>
           </div>
           <p className="text-[#8a7c74]">
             A space for poetry, writing, and heartfelt connections

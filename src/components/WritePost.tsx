@@ -245,7 +245,7 @@ export function WritePost() {
 
     setIsAnalyzing(true);
     try {
-      const response = await fetch('http://localhost:8000/api/analyze', {
+      const response = await fetch('http://127.0.0.1:8000/api/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content })
@@ -273,8 +273,8 @@ export function WritePost() {
         throw new Error("Could not parse AI response");
       }
     } catch (error: any) {
-      console.error('Error:', error);
-      toast.error(error.message || 'AI Backend unreachable. Ensure the concurrent server is running.');
+      console.error('VerseVibe AI Error:', error);
+      toast.error(error.message || 'AI Backend unreachable. Ensure the concurrent server is running on port 8000.');
     } finally {
       setIsAnalyzing(false);
     }
@@ -303,22 +303,22 @@ export function WritePost() {
 
         <Tabs defaultValue="poem" className="mb-6" onValueChange={setActiveTab}>
           <TabsList
-            className="grid w-full grid-cols-4 mb-6 rounded-xl shadow-md"
+            className="grid grid-cols-2 md:flex w-full h-auto md:h-11 gap-2 mb-6 rounded-xl shadow-md p-1 border border-[var(--theme-primary)]/10"
             style={{ backgroundColor: 'var(--theme-accent)' }}
           >
-            <TabsTrigger value="poem" className="rounded-xl">
+            <TabsTrigger value="poem" className="rounded-xl transition-all whitespace-nowrap px-4 py-2 h-9 md:h-full data-[state=active]:bg-[var(--theme-background)] data-[state=active]:shadow-sm">
               <Type className="w-4 h-4 mr-2" />
               Poem
             </TabsTrigger>
-            <TabsTrigger value="story" className="rounded-xl">
+            <TabsTrigger value="story" className="rounded-xl transition-all whitespace-nowrap px-4 py-2 h-9 md:h-full data-[state=active]:bg-[var(--theme-background)] data-[state=active]:shadow-sm">
               <PenTool className="w-4 h-4 mr-2" />
               Story
             </TabsTrigger>
-            <TabsTrigger value="article" className="rounded-xl">
+            <TabsTrigger value="article" className="rounded-xl transition-all whitespace-nowrap px-4 py-2 h-9 md:h-full data-[state=active]:bg-[var(--theme-background)] data-[state=active]:shadow-sm">
               <FileText className="w-4 h-4 mr-2" />
               Article
             </TabsTrigger>
-            <TabsTrigger value="unsent_letter" className="rounded-xl">
+            <TabsTrigger value="unsent_letter" className="rounded-xl transition-all whitespace-nowrap px-4 py-2 h-9 md:h-full data-[state=active]:bg-[var(--theme-background)] data-[state=active]:shadow-sm">
               <Mail className="w-4 h-4 mr-2" />
               Unsent Letter
             </TabsTrigger>

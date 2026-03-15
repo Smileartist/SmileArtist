@@ -5,7 +5,7 @@ import OpenAI from "openai";
 import dotenv from "dotenv";
 
 // Load environment variables from .env file
-dotenv.config();
+dotenv.config({ override: true });
 
 const app = express();
 app.use(cors());

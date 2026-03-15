@@ -48,7 +48,7 @@ export function Navigation({ activeView, onViewChange }: NavigationProps) {
         <img
           src={logo}
           alt="Smile Artist - writes the poetry he cannot live"
-          className="w-full object-contain dark:invert"
+          className="w-full object-contain dark:invert transition-all duration-300"
         />
       </div>
 

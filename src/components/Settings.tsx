@@ -11,8 +11,21 @@ import { Lang } from "../utils/i18n";
 import { toast } from "sonner";
 import {
   User, Lock, Bell, Moon, Sun, Database,
-  Trash2, Shield, UserX, LogOut, Globe, Download
+  Trash2, Shield, UserX, LogOut, Globe, Download,
+  Info, MessageSquare, Bug, FileText, Scale,
+  ChevronRight, Send, CheckCircle2, XCircle, Loader2, AtSign
 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+} from "./ui/dialog";
+import { Textarea } from "./ui/textarea";
+import { Label } from "./ui/label";
 
 interface SettingsProps {
   onLogout: () => void;
@@ -50,6 +63,21 @@ export function Settings({ onLogout, username: usernameProp, userId, onUsernameU
   // ── Language ───────────────────────────────────────────────────
   const [language, setLanguageState] = useState(localStorage.getItem("app_language") || "english");
 
+  // ── Modals State ───────────────────────────────────────────────
+  const [showAbout, setShowAbout] = useState(false);
+  const [showTerms, setShowTerms] = useState(false);
+  const [showLicense, setShowLicense] = useState(false);
+  const [showFeedback, setShowFeedback] = useState(false);
+  const [showBugReport, setShowBugReport] = useState(false);
+
+  const [feedbackMsg, setFeedbackMsg] = useState("");
+  const [bugDesc, setBugDesc] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  // ── Username availability Check ────────────────────────────────
+  const [usernameStatus, setUsernameStatus] = useState<"idle" | "checking" | "available" | "taken" | "invalid">("idle");
+  const [usernameError, setUsernameError] = useState("");
+
   // ── Init ───────────────────────────────────────────────────────
   useEffect(() => {
     const init = async () => {
@@ -61,7 +89,60 @@ export function Settings({ onLogout, username: usernameProp, userId, onUsernameU
       }
     };
     init();
-  }, []);
+  }, [userId]);
+
+  // Handle live username check
+  useEffect(() => {
+    if (!isEditingUsername) {
+      setUsernameStatus("idle");
+      setUsernameError("");
+      return;
+    }
+
+    const cleaned = editableUsername.trim().toLowerCase();
+    
+    if (cleaned === username.toLowerCase()) {
+      setUsernameStatus("idle");
+      setUsernameError("");
+      return;
+    }
+
+    if (cleaned.length === 0) {
+      setUsernameStatus("idle");
+      setUsernameError("");
+      return;
+    }
+
+    if (!/^[a-z0-9_]{3,20}$/.test(cleaned)) {
+      setUsernameStatus("invalid");
+      setUsernameError("3-20 characters, lowercase letters, numbers, and underscores only");
+      return;
+    }
+
+    const timeoutId = setTimeout(async () => {
+      setUsernameStatus("checking");
+      setUsernameError("");
+      try {
+        const { data } = await supabase
+          .from("profiles")
+          .select("id")
+          .eq("username", cleaned)
+          .maybeSingle();
+
+        if (data) {
+          setUsernameStatus("taken");
+          setUsernameError("This username is already taken");
+        } else {
+          setUsernameStatus("available");
+          setUsernameError("");
+        }
+      } catch (err) {
+        console.error("Error checking username:", err);
+      }
+    }, 500);
+
+    return () => clearTimeout(timeoutId);
+  }, [editableUsername, isEditingUsername, username]);
 
   useEffect(() => {
     if (!isEditingUsername) setEditableUsername(username);
@@ -227,6 +308,49 @@ export function Settings({ onLogout, username: usernameProp, userId, onUsernameU
     }
   };
 
+  // ── Support Handlers ───────────────────────────────────────────
+  const handleSupportAction = (type: string) => {
+    switch (type) {
+      case "about":
+        toast.info("Smile Artist v1.0.0 - A safe space for creativity.");
+        break;
+      case "feedback":
+        toast.success("Thank you! Feedback modal coming soon.");
+        break;
+      case "bug":
+        toast.error("Bug report system initialized.");
+        break;
+      case "terms":
+        toast.info("Opening terms and conditions...");
+        break;
+      case "license":
+        setShowLicense(true);
+        break;
+    }
+  };
+
+  const handleFeedbackSubmit = async () => {
+    if (!feedbackMsg.trim()) return;
+    setSubmitting(true);
+    // Mock submission
+    await new Promise(r => setTimeout(r, 1000));
+    toast.success("Feedback sent! Thank you.");
+    setFeedbackMsg("");
+    setShowFeedback(false);
+    setSubmitting(false);
+  };
+
+  const handleBugReportSubmit = async () => {
+    if (!bugDesc.trim()) return;
+    setSubmitting(true);
+    // Mock submission
+    await new Promise(r => setTimeout(r, 1000));
+    toast.success("Bug report submitted. We'll look into it.");
+    setBugDesc("");
+    setShowBugReport(false);
+    setSubmitting(false);
+  };
+
   // ── UI helpers ─────────────────────────────────────────────────
   const SettingSection = ({ title, icon: Icon, children }: any) => (
     <Card className="mb-4 backdrop-blur-sm border-2 rounded-2xl overflow-hidden"
@@ -299,16 +423,44 @@ export function Settings({ onLogout, username: usernameProp, userId, onUsernameU
         <SettingRow label={t("username")} description={t("username_desc")} column={isEditingUsername}>
           {isEditingUsername ? (
             <div className="space-y-3">
-              <Input type="text" value={editableUsername} onChange={(e) => setEditableUsername(e.target.value)}
-                className="w-full rounded-xl border-[var(--theme-primary)]/20 bg-[var(--theme-card-bg)]"
-                disabled={savingUsername} autoFocus />
+              <div className={`flex items-center w-full border rounded-xl bg-[var(--theme-card-bg)] px-3 h-10 transition-all ${
+                usernameStatus === "available" ? "border-green-400 ring-1 ring-green-400/30" :
+                usernameStatus === "taken" || usernameStatus === "invalid" ? "border-red-400 ring-1 ring-red-400/30" :
+                "border-[var(--theme-primary)]/20 focus-within:border-[var(--theme-primary)] focus-within:ring-1 focus-within:ring-[var(--theme-primary)]/30"
+              }`}>
+                <span className="text-[#8a7c74] text-sm mr-1">@</span>
+                <input 
+                  type="text" 
+                  value={editableUsername} 
+                  onChange={(e) => setEditableUsername(e.target.value)}
+                  className="flex-1 bg-transparent outline-none text-sm placeholder:text-[#8a7c74]/60 min-w-0" 
+                  style={{ color: darkMode ? "#f5e8e0" : "#2d2424" }}
+                  disabled={savingUsername} 
+                  autoFocus 
+                  maxLength={20}
+                />
+                <div className="ml-2 flex-shrink-0">
+                  {usernameStatus === "checking" && <Loader2 className="w-4 h-4 animate-spin text-[#8a7c74]" />}
+                  {usernameStatus === "available" && <CheckCircle2 className="w-4 h-4 text-green-500" />}
+                  {(usernameStatus === "taken" || usernameStatus === "invalid") && <XCircle className="w-4 h-4 text-red-500" />}
+                  {usernameStatus === "idle" && <AtSign className="w-4 h-4 text-[#8a7c74] opacity-40" />}
+                </div>
+              </div>
+              
+              {usernameStatus === "available" && (
+                <p className="text-[10px] text-green-600 px-1">✓ Available</p>
+              )}
+              {usernameError && (
+                <p className="text-[10px] text-red-500 px-1">{usernameError}</p>
+              )}
+
               <div className="flex justify-end space-x-2">
                 <Button variant="outline" onClick={() => { setIsEditingUsername(false); setEditableUsername(username); }}
-                  disabled={savingUsername} className="rounded-xl" style={{ color: darkMode ? "#f5e8e0" : "#2d2424" }}>
+                  disabled={savingUsername} className="rounded-xl h-9 px-4 text-xs" style={{ color: darkMode ? "#f5e8e0" : "#2d2424" }}>
                   {t("cancel")}
                 </Button>
-                <Button onClick={handleUsernameSave} disabled={savingUsername || editableUsername === username}
-                  className="rounded-xl px-6"
+                <Button onClick={handleUsernameSave} disabled={savingUsername || editableUsername === username || usernameStatus === "taken" || usernameStatus === "invalid" || usernameStatus === "checking"}
+                  className="rounded-xl h-9 px-6 text-xs"
                   style={{ background: "linear-gradient(to right,var(--theme-primary),var(--theme-secondary))", color: "white" }}>
                   {savingUsername ? t("saving") : t("save")}
                 </Button>
@@ -423,6 +575,161 @@ export function Settings({ onLogout, username: usernameProp, userId, onUsernameU
           </SettingRow>
         </SettingSection>
       )}
+
+      {/* Support & About */}
+      <SettingSection title={t("support_about")} icon={Info}>
+        <div className="divide-y divide-[var(--theme-primary)]/10">
+          <SettingRow label={t("about_us")} description={t("about_us_desc")}>
+            <Button onClick={() => setShowAbout(true)} variant="outline" size="sm" className="rounded-xl">
+              {t("view")}
+            </Button>
+          </SettingRow>
+
+          <SettingRow label={t("feedback")} description={t("feedback_desc")}>
+            <Button onClick={() => setShowFeedback(true)} variant="outline" size="sm" className="rounded-xl">
+              {t("submit")}
+            </Button>
+          </SettingRow>
+
+          <SettingRow label={t("report_bug")} description={t("report_bug_desc")}>
+            <Button onClick={() => setShowBugReport(true)} variant="outline" size="sm" className="rounded-xl text-red-500 border-red-200">
+              {t("report")}
+            </Button>
+          </SettingRow>
+
+          <SettingRow label={t("terms_conditions")} description={t("terms_conditions_desc")}>
+            <Button onClick={() => setShowTerms(true)} variant="outline" size="sm" className="rounded-xl">
+              {t("view")}
+            </Button>
+          </SettingRow>
+
+          <SettingRow label={t("license")} description={t("license_desc")}>
+            <Button onClick={() => setShowLicense(true)} variant="outline" size="sm" className="rounded-xl">
+              {t("view")}
+            </Button>
+          </SettingRow>
+        </div>
+      </SettingSection>
+
+      {/* --- Modals for Support section --- */}
+      
+      {/* About Us */}
+      <Dialog open={showAbout} onOpenChange={setShowAbout}>
+        <DialogContent className="max-w-md rounded-3xl border-2" style={{ borderColor: "var(--theme-primary)", backgroundColor: "var(--theme-card-bg)" }}>
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-serif text-center" style={{ color: "var(--theme-primary)" }}>Smile Artist</DialogTitle>
+            <DialogDescription className="text-center">A digital sanctuary for creative expression.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2" style={{ color: darkMode ? "#f5e8e0" : "#2d2424" }}>
+            <p className="text-sm leading-relaxed text-center">
+              <strong>Smile Artist</strong> is a dedicated space for writers, poets, and dreamers to share 
+              their innermost reflections in a beautiful, distractions-free environment.
+            </p>
+            <div className="pt-4 border-t border-[var(--theme-primary)]/10 text-center">
+              <p className="text-xs font-semibold" style={{ color: "var(--theme-primary)" }}>Version 1.0.0 (Stable Release)</p>
+              <p className="text-[10px] opacity-50 mt-1">© 2026 Smile Artist Platform. All rights reserved.</p>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Feedback Form */}
+      <Dialog open={showFeedback} onOpenChange={setShowFeedback}>
+        <DialogContent className="max-w-md rounded-3xl border-2" style={{ borderColor: "var(--theme-primary)", backgroundColor: "var(--theme-card-bg)" }}>
+          <DialogHeader>
+            <DialogTitle style={{ color: "var(--theme-primary)" }}>{t("feedback_title")}</DialogTitle>
+            <DialogDescription>{t("feedback_desc")}</DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Textarea 
+              placeholder={t("feedback_placeholder")} 
+              value={feedbackMsg} 
+              onChange={(e) => setFeedbackMsg(e.target.value)}
+              className="min-h-[120px] rounded-2xl resize-none border-[var(--theme-primary)]/20"
+            />
+          </div>
+          <DialogFooter>
+            <Button onClick={handleFeedbackSubmit} disabled={submitting || !feedbackMsg.trim()} className="w-full rounded-2xl"
+              style={{ background: "linear-gradient(to right,var(--theme-primary),var(--theme-secondary))", color: "white" }}>
+              {submitting ? t("saving") : t("submit")}
+              {!submitting && <Send className="w-4 h-4 ml-2" />}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bug Report Form */}
+      <Dialog open={showBugReport} onOpenChange={setShowBugReport}>
+        <DialogContent className="max-w-md rounded-3xl border-2" style={{ borderColor: "var(--theme-primary)", backgroundColor: "var(--theme-card-bg)" }}>
+          <DialogHeader>
+            <DialogTitle style={{ color: "#d4756f" }}>{t("bug_title")}</DialogTitle>
+            <DialogDescription>{t("report_bug_desc")}</DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Textarea 
+              placeholder={t("bug_placeholder")} 
+              value={bugDesc} 
+              onChange={(e) => setBugDesc(e.target.value)}
+              className="min-h-[120px] rounded-2xl resize-none border-red-200"
+            />
+          </div>
+          <DialogFooter>
+            <Button onClick={handleBugReportSubmit} disabled={submitting || !bugDesc.trim()} className="w-full rounded-2xl bg-red-500 hover:bg-red-600 text-white">
+              {submitting ? t("saving") : t("report")}
+              {!submitting && <Bug className="w-4 h-4 ml-2" />}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Terms & Conditions */}
+      <Dialog open={showTerms} onOpenChange={setShowTerms}>
+        <DialogContent className="max-w-xl rounded-3xl border-2 max-h-[80vh] overflow-y-auto" style={{ borderColor: "var(--theme-primary)", backgroundColor: "var(--theme-card-bg)" }}>
+          <DialogHeader>
+            <DialogTitle style={{ color: "var(--theme-primary)" }}>{t("terms_conditions")}</DialogTitle>
+            <DialogDescription>Please read our community guidelines and terms of service.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4 text-sm" style={{ color: darkMode ? "#f5e8e0" : "#2d2424" }}>
+            <section>
+              <h4 className="font-bold mb-1">1. Community Guidelines</h4>
+              <p className="opacity-80">Respect all members. Hate speech, harassment, and explicit content are strictly prohibited.</p>
+            </section>
+            <section>
+              <h4 className="font-bold mb-1">2. Content Ownership</h4>
+              <p className="opacity-80">You own the poetry and content you post. By posting, you grant Smile Artist a license to display it within the app.</p>
+            </section>
+            <section>
+              <h4 className="font-bold mb-1">3. Privacy</h4>
+              <p className="opacity-80">We value your privacy. Your personal data is handled as per our privacy policy and is never sold to third parties.</p>
+            </section>
+            <section>
+              <h4 className="font-bold mb-1">4. Account Termination</h4>
+              <p className="opacity-80">We reserve the right to suspend accounts that violate our terms or engage in harmful behavior.</p>
+            </section>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* License */}
+      <Dialog open={showLicense} onOpenChange={setShowLicense}>
+        <DialogContent className="max-w-md rounded-3xl border-2" style={{ borderColor: "var(--theme-primary)", backgroundColor: "var(--theme-card-bg)" }}>
+          <DialogHeader>
+            <DialogTitle style={{ color: "var(--theme-primary)" }}>{t("license")}</DialogTitle>
+            <DialogDescription>Open source software and assets licensing.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4 text-sm" style={{ color: darkMode ? "#f5e8e0" : "#2d2424" }}>
+            <p className="opacity-80 font-mono text-xs p-3 rounded-xl bg-black/5">
+              MIT License<br/><br/>
+              Copyright (c) 2026 Smile Artist Team<br/><br/>
+              Permission is hereby granted, free of charge, to any person obtaining a copy
+              of this software and associated documentation files...
+            </p>
+            <p className="text-xs opacity-60">
+              Smile Artist uses open-source components including React, Lucide Icons, and Radix UI.
+            </p>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Account Actions */}
       <SettingSection title={t("account_actions")} icon={Lock}>

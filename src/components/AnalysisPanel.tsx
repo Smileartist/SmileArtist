@@ -150,7 +150,7 @@ export function AnalysisPanel({ loading, result, theme }: AnalysisPanelProps) {
                         className="flex flex-col items-center justify-center py-12 text-center opacity-60"
                     >
                         <Sparkles size={32} className="mb-4 text-gray-400" />
-                        <p style={{ color: 'var(--theme-text)' }}>Write your poem, then ask TalkingBuddy to analyze it.</p>
+                        <p style={{ color: 'var(--theme-text)' }}>Write your poem, then ask VerseVibe to analyze it.</p>
                     </motion.div>
                 )}
             </AnimatePresence>
