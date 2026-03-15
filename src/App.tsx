@@ -415,7 +415,7 @@ function AppContent() {
             <MobileHeader onViewChange={handleViewChange} activeView={activeView} />
             <MobileNavigation activeView={activeView} onViewChange={handleViewChange} />
             <main 
-              className={`md:ml-64 max-w-none ${activeView === 'chats' ? 'p-0 md:h-screen overflow-hidden flex flex-col chats-main-container' : 'pt-16 pb-20 px-4 md:pt-0 md:pb-8 md:p-8'}`}
+              className={`md:ml-64 max-w-none ${activeView === 'chats' ? 'h-[100dvh] pt-16 pb-20 md:pt-0 md:pb-0 md:h-screen overflow-hidden flex flex-col' : 'pt-16 pb-20 px-4 md:pt-0 md:pb-8 md:p-8'}`}
             >
               {renderContent()}
             </main>

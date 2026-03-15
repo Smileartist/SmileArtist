@@ -3534,14 +3534,14 @@ html {
 
 /* ── Instagram-like Chat Layout ── */
 .chat-container {
+  position: fixed;
+  top: 64px; /* below app header */
+  bottom: 64px; /* matches MobileNavigation h-16 */
+  left: 0;
+  right: 0;
   display: flex;
   flex-direction: column;
-  height: 100%;
-  flex: 1;
-  min-height: 0;
-  width: 100%;
   overflow: hidden;
-  position: relative;
   z-index: 40;
 }
 
@@ -3577,6 +3577,7 @@ html {
   min-width: 0;
   height: 100%;
   min-height: 0; /* Critical for flex overflow */
+  position: relative; /* rigid anchor for absolute children input footer container */
 }
 
 .chat-main.main-hidden {
@@ -3620,10 +3621,15 @@ html {
 
 @media (min-width: 768px) {
   .chat-container {
+    position: fixed !important;
+    top: 0 !important;
+    bottom: 0 !important;
+    left: 256px !important;
+    right: 0 !important;
     display: flex !important;
     flex-direction: row !important;
-    height: 100% !important;
-    width: 100% !important;
+    height: auto !important;
+    width: auto !important;
     max-width: none !important;
     margin: 0 !important;
     border: none !important;
@@ -3641,11 +3647,19 @@ html {
     flex-shrink: 0 !important;
   }
 
+  .chat-sidebar.sidebar-hidden {
+    display: flex !important;
+  }
+
   .chat-main {
     flex: 1 !important;
     display: flex !important;
     height: 100% !important;
     min-width: 0 !important;
+  }
+
+  .chat-main.main-hidden {
+    display: flex !important;
   }
 
   .chat-back-btn {
@@ -3657,7 +3671,7 @@ html {
   .chat-sidebar {
     width: 400px;
   }
-
+}
 
 /* Final Clean CSS for Chats */
 body.chats-view {
@@ -3689,17 +3703,3 @@ body.chats-view * {
   -ms-overflow-style: none !important;
   scrollbar-width: none !important;
 }
-
-
-.chats-main-container {
-  height: calc(100dvh - 128px) !important;
-  margin-top: 64px !important;
-}
-
-@media (min-width: 768px) {
-  .chats-main-container {
-    height: 100vh !important;
-    margin-top: 0 !important;
-  }
-}
-} 

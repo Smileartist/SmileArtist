@@ -51,8 +51,35 @@ export async function handleLike(
     }
 
     // ✅ FIX:
-    // Removed manual update of posts.likes column.
-    // That logic was causing race conditions and frontend/backend mismatch.
+    // Try to atomically update the like count to avoid race conditions
+    const { error: rpcError } = await supabase.rpc(isLiked ? "increment_like_count" : "decrement_like_count", {
+      p_post_id: postId,
+    });
+
+    // Fallback if RPC doesn't exist
+    if (rpcError) {
+      console.warn("Like RPC not available, falling back:", rpcError.message);
+      const { data: postData } = await supabase
+        .from("posts")
+        .select("likes")
+        .eq("id", postId)
+        .single();
+      
+      const currentDbLikes = postData?.likes || 0;
+      const calculatedLikes = isLiked ? currentDbLikes + 1 : Math.max(0, currentDbLikes - 1);
+      
+      const { error: updateError } = await supabase
+        .from("posts")
+        .update({ likes: calculatedLikes })
+        .eq("id", postId);
+        
+      if (updateError) {
+        console.error("Failed to update post likes:", updateError);
+        throw updateError;
+      }
+      
+      newLikes = calculatedLikes;
+    }
 
     return { newLikes, isLiked };
   } catch (error) {

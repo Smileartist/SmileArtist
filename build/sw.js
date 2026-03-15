@@ -26,14 +26,32 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("fetch", (event) => {
-  // Use Cache-First for static assets, Network-First for others
   const url = new URL(event.request.url);
   
+  // Use Network-First for critical entry points to avoid serving outdated index.html
+  // with missing or broken hash links to JS/CSS chunks.
+  if (url.pathname === "/" || url.pathname === "/index.html" || url.pathname === "/manifest.json") {
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          const clonedResponse = response.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(event.request, clonedResponse);
+          });
+          return response;
+        })
+        .catch(() => caches.match(event.request))
+    );
+    return;
+  }
+
+  // Use Cache-First for other static assets defined in ASSETS
   if (ASSETS.includes(url.pathname)) {
     event.respondWith(
       caches.match(event.request).then((res) => res || fetch(event.request))
     );
   } else {
+    // Default Network-First for everything else
     event.respondWith(
       fetch(event.request).catch(() => caches.match(event.request))
     );

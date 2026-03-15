@@ -638,3 +638,45 @@ ALTER TABLE chat_participants ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "users can view their chat participants" ON chat_participants
   FOR SELECT TO authenticated
   USING (is_chat_participant(chat_id));
+
+-- ========================
+-- ATOMIC LIKE COUNT INCREMENT/DECREMENT
+-- (Bypasses RLS to allow any authenticated user to update the post's like count)
+-- ========================
+
+CREATE OR REPLACE FUNCTION increment_like_count(p_post_id uuid)
+RETURNS void AS $$
+BEGIN
+  UPDATE posts SET likes = likes + 1 WHERE id = p_post_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE OR REPLACE FUNCTION decrement_like_count(p_post_id uuid)
+RETURNS void AS $$
+BEGIN
+  UPDATE posts SET likes = GREATEST(0, likes - 1) WHERE id = p_post_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+
+-- Run this in your Supabase SQL Editor to fix the Image Upload RLS Error
+
+-- 1. Create the "chat-images" bucket if it doesn't exist
+INSERT INTO storage.buckets (id, name, public) 
+VALUES ('chat-images', 'chat-images', true) 
+ON CONFLICT (id) DO UPDATE SET public = true;
+
+-- 2. Drop any prior generic policies that might conflict
+DROP POLICY IF EXISTS "Public select for chat-images" ON storage.objects;
+DROP POLICY IF EXISTS "Authenticated users can upload to chat-images" ON storage.objects;
+
+-- 3. Create the SELECT public policy
+CREATE POLICY "Public select for chat-images" 
+ON storage.objects FOR SELECT 
+USING (bucket_id = 'chat-images');
+
+-- 4. Create the INSERT policy for authenticated users
+CREATE POLICY "Authenticated users can upload to chat-images" 
+ON storage.objects FOR INSERT 
+TO authenticated 
+WITH CHECK (bucket_id = 'chat-images');

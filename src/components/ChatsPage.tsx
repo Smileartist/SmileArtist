@@ -791,7 +791,7 @@ export function ChatsPage({ activeChatId, onViewChange }: ChatsPageProps) {
                         </div>
 
                         {/* ── Messages ── */}
-                        <div className="no-scrollbar" style={{ flex: 1, overflowY: 'auto', padding: '12px 16px', display: 'flex', flexDirection: 'column', minHeight: 0, scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                        <div className="no-scrollbar" style={{ flex: 1, overflowY: 'auto', padding: '12px 16px', paddingBottom: '80px', display: 'flex', flexDirection: 'column', minHeight: 0, scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
                             {/* Profile intro */}
                             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: '24px', paddingBottom: '40px' }}>
                                 {isTemporaryAnon ? <AnonAvatar size={80} /> : (
@@ -935,7 +935,18 @@ export function ChatsPage({ activeChatId, onViewChange }: ChatsPageProps) {
                         </div>
 
                         {/* ── Input Area ── */}
-                        <div style={{ padding: '8px 12px', flexShrink: 0, borderTop: '1px solid rgba(128,128,128,0.1)', paddingBottom: '8px', position: 'relative' }}>
+                        <div style={{ 
+                            padding: '8px 12px', 
+                            flexShrink: 0, 
+                            borderTop: '1px solid rgba(128,128,128,0.1)', 
+                            paddingBottom: '8px', 
+                            position: 'absolute', 
+                            bottom: 0, 
+                            left: 0, 
+                            right: 0, 
+                            zIndex: 110, 
+                            background: 'var(--theme-background, #fff)' 
+                        }}>
                             {/* Emoji Picker */}
                             {showEmojiPicker && (
                                 <div ref={emojiRef} style={{
