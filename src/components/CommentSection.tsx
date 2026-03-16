@@ -25,7 +25,7 @@ export function CommentSection({
   onCommentAdded,
   maxHeight = "60vh",
 }: CommentSectionProps) {
-  const { avatarUrl, username, userId: currentUserId } = useUserData();
+  const { avatarUrl, username, userId: currentUserId, openLoginModal } = useUserData();
   const [comments, setComments] = useState<any[]>([]);
   const [newCommentContent, setNewCommentContent] = useState("");
   const [loading, setLoading] = useState(false);
@@ -89,7 +89,7 @@ export function CommentSection({
   const handleSubmitComment = async () => {
     const trimmed = newCommentContent.trim();
     if (!trimmed || submitting) return;
-    if (!currentUserId) { alert("Login required"); return; }
+    if (!currentUserId) { openLoginModal(); return; }
 
     setSubmitting(true);
     try {
@@ -108,7 +108,7 @@ export function CommentSection({
   };
 
   const toggleCommentLike = async (commentId: string) => {
-    if (!currentUserId) return;
+    if (!currentUserId) { openLoginModal(); return; }
     const isLiked = likedComments.has(commentId);
 
     setLikedComments((prev) => {
@@ -224,7 +224,7 @@ export function CommentSection({
               </div>
 
               <div className="flex items-center gap-1">
-                <button onClick={() => toggleCommentLike(comment.id)} className="flex-shrink-0 p-1" disabled={!currentUserId}>
+                <button onClick={() => toggleCommentLike(comment.id)} className="flex-shrink-0 p-1">
                   <Heart className="w-3.5 h-3.5" fill={isLiked ? "var(--theme-primary)" : "none"} color={isLiked ? "var(--theme-primary)" : "var(--theme-text)"} style={{ opacity: isLiked ? 1 : 0.4 }} />
                 </button>
 

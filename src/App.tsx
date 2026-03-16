@@ -36,6 +36,7 @@ export const UserDataContext = createContext<{
   toggleSavedPost: (postId: string, isSaved: boolean) => void;
   onViewChange: (view: string, targetId?: string | null, showComments?: boolean) => void;
   showInstallPrompt: () => Promise<void>;
+  openLoginModal: () => void;
 }>({
   avatarUrl: null,
   username: "",
@@ -50,6 +51,7 @@ export const UserDataContext = createContext<{
   toggleSavedPost: () => { },
   onViewChange: () => { },
   showInstallPrompt: async () => { },
+  openLoginModal: () => { },
 });
 
 export const useUserData = () => useContext(UserDataContext);
@@ -63,6 +65,8 @@ function AppContent() {
   const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null); // New state for selected user profile
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
   const [initialShowComments, setInitialShowComments] = useState(false);
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  const [initializing, setInitializing] = useState(true);
 
   // ── PWA Installation ──────────────────────────────────────────
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
@@ -175,6 +179,7 @@ function AppContent() {
         setUsername("");
         setUserId("");
       }
+      setInitializing(false);
     };
     getSession();
 
@@ -259,6 +264,12 @@ function AppContent() {
 
   // Updated onViewChange to accept an optional targetUserId or targetChatId
   const handleViewChange = (view: string, targetId: string | null = null) => {
+    const protectedViews = ['write', 'chats', 'notifications', 'settings', 'buddy', 'library'];
+    if (!isLoggedIn && (protectedViews.includes(view) || (view === "profile" && !targetId))) {
+      setIsLoginModalOpen(true);
+      return;
+    }
+
     if (view === "profile") {
       setSelectedProfileId(targetId);
       setActiveChatId(null);
@@ -342,6 +353,23 @@ function AppContent() {
   // ──────────────────────────────────────────────────────────────
 
   const renderContent = () => {
+    const protectedViews = ['write', 'chats', 'notifications', 'settings', 'buddy', 'library'];
+    if (!initializing && !isLoggedIn && protectedViews.includes(activeView)) {
+      return (
+        <div className="flex flex-col items-center justify-center py-20 gap-4 text-center">
+          <p className="text-xl font-bold" style={{ color: "var(--theme-text)" }}>Login Required</p>
+          <p className="opacity-70" style={{ color: "var(--theme-text)" }}>You need to be logged in to view this page.</p>
+          <button 
+            onClick={() => setIsLoginModalOpen(true)}
+            className="px-6 py-2 rounded-xl text-white font-bold"
+            style={{ background: `linear-gradient(to right, var(--theme-primary), var(--theme-secondary))` }}
+          >
+            Login / Signup
+          </button>
+        </div>
+      );
+    }
+
     switch (activeView) {
       case "home":
         return <HomePage />;
@@ -397,7 +425,8 @@ function AppContent() {
       toggleLikedPost, toggleSavedPost,
       refreshAvatar, refreshUserData, 
       refreshInteractions: async () => { if (userId) await fetchInteractions(userId); },
-      onViewChange: handleViewChange 
+      onViewChange: handleViewChange,
+      openLoginModal: () => { setIsLoginModalOpen(true); }
     }}>
       <div
         className="min-h-screen transition-colors duration-300 overflow-x-hidden"
@@ -407,8 +436,10 @@ function AppContent() {
           fontSize: "var(--theme-font-size)",
         }}
       >
-        {!isLoggedIn ? (
-          <Login onLogin={handleLogin} />
+        {initializing ? (
+          <div className="min-h-screen flex items-center justify-center">
+            <div className="w-8 h-8 rounded-full border-2 animate-spin" style={{ borderColor: "var(--theme-primary)", borderTopColor: "transparent" }} />
+          </div>
         ) : (
           <>
             <Navigation activeView={activeView} onViewChange={handleViewChange} />
@@ -428,6 +459,39 @@ function AppContent() {
                 handleViewChange(activeView); 
               }} 
             />
+            {isLoginModalOpen && (
+              <div 
+                style={{
+                  position: 'fixed',
+                  top: 0, left: 0, right: 0, bottom: 0,
+                  zIndex: 10000,
+                  display: 'flex',
+                  overflowY: 'auto',
+                  backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                  backdropFilter: 'blur(4px)',
+                  padding: window.innerWidth < 640 ? '0' : '2rem 1rem'
+                }}
+              >
+                <div 
+                  style={{
+                    position: 'relative',
+                    width: '100%',
+                    maxWidth: window.innerWidth < 640 ? '100%' : '448px',
+                    height: window.innerWidth < 640 ? '100vh' : 'auto',
+                    margin: 'auto',
+                    backgroundColor: 'white',
+                    borderRadius: window.innerWidth < 640 ? '0' : '1.5rem',
+                    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+                    overflow: 'hidden',
+                    display: 'flex',
+                    flexDirection: 'column'
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <Login onLogin={(u, id) => { handleLogin(u, id); setIsLoginModalOpen(false); }} isModal={true} onClose={() => setIsLoginModalOpen(false)} />
+                </div>
+              </div>
+            )}
           </>
         )}
       </div>

@@ -34,7 +34,7 @@ export function PostCard({
   initialCommentsExpanded = false,
   layout = 'feed'
 }: PostCardProps) {
-  const { onViewChange, userId: currentUserId, likedPostIds, savedPostIds, toggleLikedPost, toggleSavedPost } = useUserData();
+  const { onViewChange, userId: currentUserId, likedPostIds, savedPostIds, toggleLikedPost, toggleSavedPost, openLoginModal } = useUserData();
   const { postId, author, content, title, likes, comments: initialComments, created_at: timestamp, category, user_id } = post;
 
   const [likeCount, setLikeCount] = useState(likes || 0);
@@ -46,7 +46,7 @@ export function PostCard({
   const isSaved = savedPostIds.has(postId);
 
   const handleLike = async () => {
-    if (!currentUserId) return alert("Login required");
+    if (!currentUserId) { openLoginModal(); return; }
 
     const prevLiked = isLiked;
     const prevLikeCount = likeCount;
@@ -67,7 +67,7 @@ export function PostCard({
   };
 
   const handleSave = async () => {
-    if (!currentUserId) return alert("Login required");
+    if (!currentUserId) { openLoginModal(); return; }
 
     const prevSaved = isSaved;
     toggleSavedPost(postId, !prevSaved);
