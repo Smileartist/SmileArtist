@@ -112,7 +112,7 @@ export function NotificationSettings({ userId }: NotificationSettingsProps) {
               Enable standard browser push streams to receive these alerts on your device.
             </p>
           </div>
-          <Button size="sm" onClick={handleEnableEnableBrowser} className="bg-[var(--theme-primary)] hover:bg-[var(--theme-secondary)] text-white text-xs rounded-lg shadow-sm">
+          <Button size="sm" onClick={handleEnableEnableBrowser} className="bg-[#d4756f] hover:bg-[#c1645e] text-white font-semibold text-xs rounded-lg shadow-md px-4 h-8 transition-transform active:scale-95">
             Enable
           </Button>
         </div>

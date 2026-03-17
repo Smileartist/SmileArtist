@@ -41,7 +41,7 @@ export function NotificationPermissionBanner({ userId }: PermissionBannerProps) 
   if (!isVisible) return null;
 
   return (
-    <div className="fixed bottom-24 left-4 right-4 md:left-auto md:right-8 md:bottom-8 z-50 animate-in fade-in slide-in-from-bottom-5 duration-500 max-w-md">
+    <div className="fixed bottom-24 left-4 right-4 md:left-auto md:right-8 md:bottom-8 z-[9999] animate-in fade-in slide-in-from-bottom-5 duration-500 max-w-md">
       <div className="bg-white/95 backdrop-blur-md border border-[var(--theme-primary)]/20 rounded-2xl p-4 shadow-xl flex items-start gap-4">
         <div className="flex-shrink-0 bg-[var(--theme-primary)]/10 p-2 rounded-xl">
           <Bell className="w-6 h-6" style={{ color: "var(--theme-primary)" }} />
@@ -57,7 +57,7 @@ export function NotificationPermissionBanner({ userId }: PermissionBannerProps) 
             <Button 
               size="sm" 
               onClick={handleEnable}
-              className="bg-gradient-to-r from-[var(--theme-primary)] to-[var(--theme-secondary)] text-white text-xs h-8 px-3 rounded-lg"
+              className="bg-[var(--theme-primary)] hover:bg-[var(--theme-secondary)] text-white font-semibold text-xs h-8 px-4 rounded-xl shadow-md transition-transform active:scale-95"
             >
               Enable Notifications
             </Button>
@@ -65,7 +65,7 @@ export function NotificationPermissionBanner({ userId }: PermissionBannerProps) 
               size="sm" 
               variant="outline" 
               onClick={handleDismiss}
-              className="border-[var(--theme-primary)]/20 h-8 text-xs px-3 rounded-lg hover:bg-[var(--theme-primary)]/5"
+              className="border-[var(--theme-primary)]/20 text-[#8a7c74] hover:text-[var(--theme-primary)] h-8 text-xs px-4 rounded-xl hover:bg-[var(--theme-primary)]/5 transition-colors"
             >
               Maybe Later
             </Button>
