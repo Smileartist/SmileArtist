@@ -11,6 +11,7 @@ interface LoginProps {
   onLogin: (username: string, userId: string) => void;
   isModal?: boolean;
   onClose?: () => void;
+  onViewChange?: (view: string) => void;
 }
 
 type Screen = "auth" | "choose-username";
@@ -24,7 +25,7 @@ const GoogleIcon = () => (
   </svg>
 );
 
-export function Login({ onLogin, isModal = false, onClose }: LoginProps) {
+export function Login({ onLogin, isModal = false, onClose, onViewChange }: LoginProps) {
   const { isInstallable, showInstallPrompt } = useUserData();
   const [screen, setScreen] = useState<Screen>("auth");
   const [isSignup, setIsSignup] = useState(false);
@@ -469,6 +470,14 @@ export function Login({ onLogin, isModal = false, onClose }: LoginProps) {
         <p className="text-center text-xs text-[#8a7c74] mt-4">
           A safe, supportive space for your creative expression
         </p>
+
+        <div className="flex flex-wrap justify-center items-center gap-y-1 mt-3 text-xs text-[#8a7c74]/80 border-t border-[#d4756f]/10 pt-3 pb-3">
+          <a href="/?view=about" onClick={(e) => { e.preventDefault(); onClose?.(); onViewChange?.("about"); }} className="hover:text-[#d4756f] hover:underline transition-colors px-1">About Us</a>
+          <span className="opacity-40">•</span>
+          <a href="/?view=terms" onClick={(e) => { e.preventDefault(); onClose?.(); onViewChange?.("terms"); }} className="hover:text-[#d4756f] hover:underline transition-colors px-1">Terms</a>
+          <span className="opacity-40">•</span>
+          <a href="/?view=privacy" onClick={(e) => { e.preventDefault(); onClose?.(); onViewChange?.("privacy"); }} className="hover:text-[#d4756f] hover:underline transition-colors px-1">Privacy Policy</a>
+        </div>
       </div>
     </div>
   );

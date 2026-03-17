@@ -17,6 +17,12 @@ import { Login } from "./components/Login";
 import { Settings } from "./components/Settings";
 import { PostModal } from "./components/PostModal";
 import { PostDetail } from "./components/PostDetail";
+import AboutUs from "./components/support/AboutUs";
+import Feedback from "./components/support/Feedback";
+import ReportBug from "./components/support/ReportBug";
+import Terms from "./components/support/Terms";
+import License from "./components/support/License";
+import Privacy from "./components/support/Privacy";
 
 
 import { supabase } from "./utils/supabaseClient";
@@ -398,8 +404,21 @@ function AppContent() {
             username={username}
             userId={userId}
             onUsernameUpdate={setUsername}
+            onViewChange={handleViewChange}
           />
         );
+      case "about":
+        return <AboutUs />;
+      case "feedback":
+        return <Feedback />;
+      case "report-bug":
+        return <ReportBug />;
+      case "terms":
+        return <Terms />;
+      case "license":
+        return <License />;
+      case "privacy":
+        return <Privacy />;
       default:
         // Pass the targetId (from URL) to HomePage to allow highlighting/scrolling to a post
         return <HomePage targetPostId={activeView === 'home' ? activeChatId : null} />;
@@ -467,28 +486,33 @@ function AppContent() {
                   zIndex: 10000,
                   display: 'flex',
                   overflowY: 'auto',
-                  backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                  background: "linear-gradient(135deg, #fef9f5 0%, #fce4da 50%, #f5e8e0 100%)",
                   backdropFilter: 'blur(4px)',
-                  padding: window.innerWidth < 640 ? '0' : '2rem 1rem'
+                  padding: '2rem 1rem'
                 }}
               >
                 <div 
                   style={{
                     position: 'relative',
                     width: '100%',
-                    maxWidth: window.innerWidth < 640 ? '100%' : '448px',
-                    height: window.innerWidth < 640 ? '100vh' : 'auto',
+                    maxWidth: '400px',
+                    height: 'auto',
                     margin: 'auto',
                     backgroundColor: 'white',
-                    borderRadius: window.innerWidth < 640 ? '0' : '1.5rem',
-                    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+                    borderRadius: '1.5rem',
+                    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.15)',
                     overflow: 'hidden',
                     display: 'flex',
                     flexDirection: 'column'
                   }}
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <Login onLogin={(u, id) => { handleLogin(u, id); setIsLoginModalOpen(false); }} isModal={true} onClose={() => setIsLoginModalOpen(false)} />
+                  <Login 
+                    onLogin={(u, id) => { handleLogin(u, id); setIsLoginModalOpen(false); }} 
+                    isModal={true} 
+                    onClose={() => setIsLoginModalOpen(false)} 
+                    onViewChange={handleViewChange}
+                  />
                 </div>
               </div>
             )}

@@ -32,9 +32,10 @@ interface SettingsProps {
   username: string;
   userId: string;
   onUsernameUpdate: (newUsername: string) => void;
+  onViewChange: (view: string) => void;
 }
 
-export function Settings({ onLogout, username: usernameProp, userId, onUsernameUpdate }: SettingsProps) {
+export function Settings({ onLogout, username: usernameProp, userId, onUsernameUpdate, onViewChange }: SettingsProps) {
   const { updateTheme } = useTheme();
   const { username: contextUsername, refreshUserData, isInstallable, showInstallPrompt } = useUserData();
   const { t, setLanguage: applyLanguage } = useLanguage();
@@ -580,31 +581,37 @@ export function Settings({ onLogout, username: usernameProp, userId, onUsernameU
       <SettingSection title={t("support_about")} icon={Info}>
         <div className="divide-y divide-[var(--theme-primary)]/10">
           <SettingRow label={t("about_us")} description={t("about_us_desc")}>
-            <Button onClick={() => setShowAbout(true)} variant="outline" size="sm" className="rounded-xl">
+            <Button onClick={() => onViewChange("about")} variant="outline" size="sm" className="rounded-xl">
               {t("view")}
             </Button>
           </SettingRow>
 
           <SettingRow label={t("feedback")} description={t("feedback_desc")}>
-            <Button onClick={() => setShowFeedback(true)} variant="outline" size="sm" className="rounded-xl">
+            <Button onClick={() => onViewChange("feedback")} variant="outline" size="sm" className="rounded-xl">
               {t("submit")}
             </Button>
           </SettingRow>
 
           <SettingRow label={t("report_bug")} description={t("report_bug_desc")}>
-            <Button onClick={() => setShowBugReport(true)} variant="outline" size="sm" className="rounded-xl text-red-500 border-red-200">
+            <Button onClick={() => onViewChange("report-bug")} variant="outline" size="sm" className="rounded-xl text-red-500 border-red-200">
               {t("report")}
             </Button>
           </SettingRow>
 
           <SettingRow label={t("terms_conditions")} description={t("terms_conditions_desc")}>
-            <Button onClick={() => setShowTerms(true)} variant="outline" size="sm" className="rounded-xl">
+            <Button onClick={() => onViewChange("terms")} variant="outline" size="sm" className="rounded-xl">
               {t("view")}
             </Button>
           </SettingRow>
 
           <SettingRow label={t("license")} description={t("license_desc")}>
-            <Button onClick={() => setShowLicense(true)} variant="outline" size="sm" className="rounded-xl">
+            <Button onClick={() => onViewChange("license")} variant="outline" size="sm" className="rounded-xl">
+              {t("view")}
+            </Button>
+          </SettingRow>
+
+          <SettingRow label={"Privacy Policy"} description={"Review how your data is handled"}>
+            <Button onClick={() => onViewChange("privacy")} variant="outline" size="sm" className="rounded-xl">
               {t("view")}
             </Button>
           </SettingRow>

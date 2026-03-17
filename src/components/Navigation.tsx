@@ -222,6 +222,7 @@ export function Navigation({ activeView, onViewChange }: NavigationProps) {
         </button>
       </div>
 
+
       <Button
         className="w-full mt-4 mb-2 text-white shadow-md rounded-xl"
         style={{

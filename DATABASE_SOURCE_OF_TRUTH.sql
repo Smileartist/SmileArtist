@@ -680,3 +680,36 @@ CREATE POLICY "Authenticated users can upload to chat-images"
 ON storage.objects FOR INSERT 
 TO authenticated 
 WITH CHECK (bucket_id = 'chat-images');
+
+
+-- ========================
+-- FEEDBACK
+-- ========================
+create table feedback (
+  id uuid primary key default gen_random_uuid(),
+  name text,
+  email text,
+  message text not null,
+  created_at timestamptz default now()
+);
+
+alter table feedback enable row level security;
+create policy "Enable insert for everyone" on feedback for insert with check (true);
+
+
+-- ========================
+-- BUG REPORTS
+-- ========================
+create table bug_reports (
+  id uuid primary key default gen_random_uuid(),
+  name text,
+  email text,
+  title text not null,
+  description text not null,
+  steps text,
+  screenshot_url text,
+  created_at timestamptz default now()
+);
+
+alter table bug_reports enable row level security;
+create policy "Enable insert for everyone" on bug_reports for insert with check (true);
