@@ -1,3 +1,5 @@
+import { toast } from "sonner";
+
 /**
  * Utility function to convert VAPID public key
  */
@@ -31,19 +33,19 @@ export async function subscribeToPush(userId: string): Promise<boolean> {
     return false;
   }
 
-  try {
-    const permission = await Notification.requestPermission();
-    if (permission !== "granted") {
-      console.log("Permission not granted for notifications.");
-      return false;
-    }
+    try {
+      const permission = await Notification.requestPermission();
+      if (permission !== "granted") {
+        toast.error("Browser Permission denied. Please allow notifications in your App/System settings.");
+        return false;
+      }
 
     const registration = await navigator.serviceWorker.ready;
 
     // Get VAPID Public Key from environment variables
     const vapidPublicKey = (import.meta as any).env.VITE_VAPID_PUBLIC_KEY;
     if (!vapidPublicKey) {
-      console.error("VITE_VAPID_PUBLIC_KEY is not configured in .env");
+      toast.error("VITE_VAPID_PUBLIC_KEY is not configured in .env on frontend");
       return false;
     }
 
@@ -75,8 +77,9 @@ export async function subscribeToPush(userId: string): Promise<boolean> {
     }
 
     return true;
-  } catch (err) {
+  } catch (err: any) {
     console.error("Error subscribing to push:", err);
+    toast.error(`Push Setup Failed: ${err.message || err}`);
     return false;
   }
 }
