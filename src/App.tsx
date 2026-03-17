@@ -23,6 +23,7 @@ import ReportBug from "./components/support/ReportBug";
 import Terms from "./components/support/Terms";
 import License from "./components/support/License";
 import Privacy from "./components/support/Privacy";
+import { NotificationPermissionBanner } from "./components/NotificationPermissionBanner";
 
 
 import { supabase } from "./utils/supabaseClient";
@@ -516,6 +517,7 @@ function AppContent() {
                 </div>
               </div>
             )}
+            {userId && <NotificationPermissionBanner userId={userId} />}
           </>
         )}
       </div>

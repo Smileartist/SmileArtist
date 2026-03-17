@@ -14,6 +14,7 @@ import { ensureUserExists } from "../utils/ensureUserExists";
 import { toast } from "sonner";
 import { PostModal } from "./PostModal";
 import { Checkbox } from "./ui/checkbox";
+import { triggerPushNotification } from "../utils/pushNotifications";
 
 interface ProfilePageProps {
   onViewChange?: (view: string, userId?: string | null) => void;
@@ -31,7 +32,7 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
   const [followerCount, setFollowerCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
   const [followLoading, setFollowLoading] = useState(false);
-  
+
   // Follower list for the Followers tab
   const [followersList, setFollowersList] = useState<any[]>([]);
 
@@ -52,10 +53,12 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
   const fetchFollowData = async (currId: string | null, targetIdInput?: string) => {
     const activeTargetId = targetIdInput || targetUuid;
     if (!activeTargetId) return;
+
     const { count: followers } = await supabase
       .from("follows")
       .select("*", { count: "exact", head: true })
       .eq("following_id", activeTargetId);
+    
     setFollowerCount(followers ?? 0);
 
     // Fetch following count
@@ -70,7 +73,7 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
       .from("follows")
       .select("follower_id")
       .eq("following_id", activeTargetId);
-      
+
     if (followersData && followersData.length > 0) {
       const followerIds = followersData.map(f => f.follower_id);
       const { data: profiles } = await supabase
@@ -86,7 +89,7 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
       setIsFollowing(false);
       return;
     }
-    
+
     if (currId && currId !== activeTargetId) {
       const { data } = await supabase
         .from("follows")
@@ -126,6 +129,13 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
           content: "started following you",
           is_read: false,
         });
+        triggerPushNotification({
+          userId: targetUuid!,
+          title: "👤 New Follower",
+          body: `${profileUser.name} started following you`,
+          url: `/?view=profile&targetId=${currentUserId}`,
+          type: "follows"
+        });
         toast.success("Following! 🎉");
       }
     } catch (err: any) {
@@ -141,7 +151,7 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
       await supabase.from("follows").delete()
         .eq("follower_id", followerIdToRemove)
         .eq("following_id", currentUserId); // currentUserId is the following_id here because it's YOUR profile
-      
+
       setFollowerCount(c => Math.max(0, c - 1));
       setFollowersList(prev => prev.filter(f => f.id !== followerIdToRemove));
       toast.success("Follower removed");
@@ -156,7 +166,7 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
     const resolveAndFetch = async () => {
       setLoading(true);
       try {
-        let resolvedId = userId;
+        let resolvedId = userId || currentUserId;
         // If it's a username (e.g., '@dhruvv' or just 'dhruvv' without dashes)
         if (userId && (userId.includes('@') || !userId.includes('-'))) {
           const cleanUsername = userId.replace('@', '');
@@ -169,7 +179,7 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
             resolvedId = data.id;
           }
         }
-        
+
         setTargetUuid(resolvedId);
         if (resolvedId && currentUserId) {
           checkBuddyStatus(resolvedId);
@@ -229,8 +239,8 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
       }
     };
 
-    if (userId) resolveAndFetch();
-  }, [userId]);
+    if (userId || currentUserId) resolveAndFetch();
+  }, [userId, currentUserId]);
 
   // Determine if this profile belongs to the logged-in user
   useEffect(() => {
@@ -259,16 +269,17 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
     }
   }, [targetUuid, currentUserId]);
 
-  // Removed redundant buddy/follow effect as it is now handled in resolveAndFetch and on login
-  
+  // Fetch buddy status and follow data when targetUuid or currentUserId changes
   useEffect(() => {
-    if (currentUserId && targetUuid && currentUserId !== targetUuid) {
-      checkBuddyStatus();
+    if (targetUuid) {
+      if (currentUserId && currentUserId !== targetUuid) {
+        checkBuddyStatus();
+      } else if (currentUserId && currentUserId === targetUuid) {
+        setBuddyStatus(null);
+      }
       fetchFollowData(currentUserId);
-    } else if (targetUuid && currentUserId === targetUuid) {
-      setBuddyStatus(null);
     }
-  }, [currentUserId, targetUuid]); // re-run if target user or current user changes
+  }, [currentUserId, targetUuid]);
 
   const isOwnProfile = currentUserId === targetUuid;
 
@@ -325,10 +336,10 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
       .select('id, status, from_user, to_user')
       .or(`and(from_user.eq.${currentUserId},to_user.eq.${activeTargetId}),and(from_user.eq.${activeTargetId},to_user.eq.${currentUserId})`);
 
-    if (!results || results.length === 0) { 
-      setBuddyStatus(null); 
-      setBuddyRequestId(null); 
-      return; 
+    if (!results || results.length === 0) {
+      setBuddyStatus(null);
+      setBuddyRequestId(null);
+      return;
     }
 
     // Prioritize 'accepted' status if multiple exist
@@ -370,6 +381,13 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
         content: 'sent you a buddy request',
         is_read: false,
       });
+      triggerPushNotification({
+        userId: targetUuid!,
+        title: "🤝 Buddy Request",
+        body: `${profileUser.name} sent you a buddy request`,
+        url: `/?view=profile&targetId=${currentUserId}`,
+        type: "buddies"
+      });
       toast.success('Buddy request sent!');
     } catch (err: any) {
       toast.error(err.message || 'Failed to send buddy request');
@@ -403,6 +421,13 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
         content: 'accepted your buddy request',
         is_read: false,
       });
+      triggerPushNotification({
+        userId: targetUuid!,
+        title: "🤝 Buddy Request Accepted",
+        body: `${profileUser.name} accepted your buddy request`,
+        url: `/?view=chats`,
+        type: "buddies"
+      });
 
       setBuddyStatus('accepted');
       toast.success('You are now buddies! Start chatting 💬');
@@ -427,7 +452,7 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
       if (request) {
         // Delete the buddy request
         await supabase.from('buddy_requests').delete().eq('id', request.id);
-        
+
         // Ensure chat status gets downgraded or deleted. We'll simply let their connection break.
         // If they had a buddy chat, we can optionally downgrade it or drop them as participants,
         // but physically removing the buddy request record breaks the buddy bond.
@@ -435,13 +460,13 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
 
       setBuddiesList(prev => prev.filter(b => b.id !== buddyIdToRemove));
       setBuddyCount(c => Math.max(0, c - 1));
-      
+
       // If we are currently on the removed buddy's profile, reset buddyStatus
       if (buddyIdToRemove === targetUuid || buddyIdToRemove === userId) {
         setBuddyStatus(null);
         setBuddyRequestId(null);
       }
-      
+
       toast.success("Buddy removed");
     } catch (err: any) {
       toast.error(err.message || "Failed to remove buddy");
@@ -532,14 +557,14 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
       setCoverFile(null);
       toast.success("Profile updated successfully!");
       setIsEditing(false);
-      
+
       // Update local profileData without refetching since fetchProfileData is not in scope here
       if (data && data.length > 0) {
         setProfileData(data[0]);
       } else {
         setProfileData((prev: any) => ({ ...prev, ...updateData }));
       }
-      
+
       await refreshAvatar();
     } catch (error: any) {
       console.error("Final error during profile update:", error);
@@ -721,16 +746,16 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
                     )}
                     {buddyStatus === 'accepted' && (
                       <div className="flex items-center gap-2">
-                        <Badge 
+                        <Badge
                           className="rounded-xl px-4 py-2 flex items-center gap-2 bg-[var(--theme-accent)] text-[var(--theme-primary)] border border-[var(--theme-primary)]/20 shadow-sm"
                         >
                           <Smile className="w-4 h-4" />
                           <span className="font-bold">YOUR BUDDY</span>
                         </Badge>
-                        <Button 
-                          variant="ghost" 
+                        <Button
+                          variant="ghost"
                           size="sm"
-                          className="rounded-xl opacity-30 hover:opacity-100 hover:text-red-500 transition-opacity" 
+                          className="rounded-xl opacity-30 hover:opacity-100 hover:text-red-500 transition-opacity"
                           onClick={() => targetUuid && removeBuddy(targetUuid)}
                           title="Remove Buddy"
                         >
@@ -746,7 +771,7 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
                         // If not, we use the message request function.
                         const isAcceptedBuddy = buddyStatus === 'accepted';
                         const rpcName = isAcceptedBuddy ? "get_or_create_buddy_chat" : "get_or_create_message_request_chat";
-                        
+
                         const { data: chatId, error } = await supabase.rpc(rpcName, {
                           p_user_id: currentUserId,
                           ...(isAcceptedBuddy ? { p_buddy_id: targetUuid } : { p_target_id: targetUuid })
@@ -1217,9 +1242,9 @@ export function ProfilePage({ onViewChange, userId }: ProfilePageProps) {
       </div>
 
       {selectedPost && (
-        <PostModal 
-          postId={selectedPost.postId} 
-          onClose={() => setSelectedPost(null)} 
+        <PostModal
+          postId={selectedPost.postId}
+          onClose={() => setSelectedPost(null)}
         />
       )}
     </div>

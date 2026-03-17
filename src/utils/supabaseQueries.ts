@@ -267,6 +267,33 @@ export const sendBuddyMessage = async (chatId: string, userId: string, content: 
     console.error("Send message error desarialise:", error);
     throw error;
   }
+
+  // Background Push Trigger
+  (async () => {
+    try {
+      const { data: participants } = await supabase
+        .from("chat_participants")
+        .select("user_id")
+        .eq("chat_id", chatId)
+        .neq("user_id", userId);
+
+      const recipientId = participants?.[0]?.user_id;
+      if (recipientId) {
+        const { triggerPushNotification } = await import("./pushNotifications");
+        const { data: sender } = await supabase.from("profiles").select("full_name").eq("id", userId).maybeSingle();
+        
+        triggerPushNotification({
+          userId: recipientId,
+          title: "💬 New Message",
+          body: `${sender?.full_name || "Someone"}: ${content.substring(0, 50)}${content.length > 50 ? '...' : ''}`,
+          url: `/?view=chats&targetId=${chatId}`,
+          type: "chats"
+        });
+      }
+    } catch (e) {
+      console.error("Failed to trigger push for message:", e);
+    }
+  })();
 };
 
 // sendBuddyMessageRpc: calls the SECURITY DEFINER RPC 'send_buddy_message'
@@ -283,6 +310,33 @@ export const sendBuddyMessageRpc = async (chatId: string, userId: string, conten
     console.error("sendBuddyMessageRpc error:", error);
     throw error;
   }
+
+  // Background Push Trigger
+  (async () => {
+    try {
+      const { data: participants } = await supabase
+        .from("chat_participants")
+        .select("user_id")
+        .eq("chat_id", chatId)
+        .neq("user_id", userId);
+
+      const recipientId = participants?.[0]?.user_id;
+      if (recipientId) {
+        const { triggerPushNotification } = await import("./pushNotifications");
+        const { data: sender } = await supabase.from("profiles").select("full_name").eq("id", userId).maybeSingle();
+        
+        triggerPushNotification({
+          userId: recipientId,
+          title: "💬 New Message",
+          body: `${sender?.full_name || "Someone"}: ${content.substring(0, 50)}${content.length > 50 ? '...' : ''}`,
+          url: `/?view=chats&targetId=${chatId}`,
+          type: "chats"
+        });
+      }
+    } catch (e) {
+      console.error("Failed to trigger push for rpc message:", e);
+    }
+  })();
 };
 
 export const getChatMessages = async (chatId: string) => {

@@ -26,6 +26,7 @@ import {
 } from "./ui/dialog";
 import { Textarea } from "./ui/textarea";
 import { Label } from "./ui/label";
+import { NotificationSettings } from "./NotificationSettings";
 
 interface SettingsProps {
   onLogout: () => void;
@@ -506,15 +507,10 @@ export function Settings({ onLogout, username: usernameProp, userId, onUsernameU
 
       {/* Notifications */}
       <SettingSection title={t("notifications")} icon={Bell}>
-        <SettingRow label={t("push_notifications")} description={t("push_notif_desc")}>
-          <Toggle checked={pushNotifications} onChange={setPushNotifications} />
-        </SettingRow>
-        {pushNotifications && (
-          <p className="text-xs px-1" style={{ color: darkMode ? "#c9a28f" : "#8a7c74" }}>
-            ✅ Push notifications are enabled for this browser
-          </p>
-        )}
+        <NotificationSettings userId={userId || ""} />
       </SettingSection>
+
+      {/* Appearance */}
 
       {/* Appearance */}
       <SettingSection title={t("appearance")} icon={darkMode ? Moon : Sun}>

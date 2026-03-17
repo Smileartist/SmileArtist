@@ -7,6 +7,10 @@ import dotenv from "dotenv";
 // Load environment variables from .env file
 dotenv.config({ override: true });
 
+import subscribeHandler from "./api/notifications/subscribe.js";
+import unsubscribeHandler from "./api/notifications/unsubscribe.js";
+import sendHandler from "./api/notifications/send.js";
+
 const app = express();
 app.use(cors());
 app.use(bodyParser.json());
@@ -63,5 +67,9 @@ app.post("/api/analyze", async (req, res) => {
     res.status(500).json({ error: e.message || "Analysis failed. Please try again." });
   }
 });
+
+app.post("/api/notifications/subscribe", subscribeHandler);
+app.post("/api/notifications/unsubscribe", unsubscribeHandler);
+app.post("/api/notifications/send", sendHandler);
 
 app.listen(8000, () => console.log("AI server running on 8000"));

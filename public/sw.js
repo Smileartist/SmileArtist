@@ -59,22 +59,53 @@ self.addEventListener("fetch", (event) => {
 });
 
 self.addEventListener("push", (event) => {
-  const data = event.data ? event.data.json() : {};
-  event.waitUntil(
-    self.registration.showNotification(data.title || "Smile Artist", {
-      body: data.body || "You have a new notification",
-      icon: "/icon-512.png",
-      badge: "/icon-512.png",
-    })
-  );
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch (e) {
+    console.error("Failed to parse push data as JSON", e);
+    // Fallback if data is raw text
+    data = { title: "Smile Artist", body: event.data ? event.data.text() : "New notification" };
+  }
+
+  const title = data.title || "Smile Artist";
+  const options = {
+    body: data.body || "A safe, supportive space for your creative expression",
+    icon: data.icon || "/icons/notification-icon-192.png",
+    badge: data.badge || "/icons/badge-72.png",
+    vibrate: [200, 100, 200],
+    requireInteraction: data.type === "chat" || data.type === "buddy_request",
+    data: {
+      url: data.url || "/",
+      type: data.type
+    }
+  };
+
+  event.waitUntil(self.registration.showNotification(title, options));
 });
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
+  
+  const targetUrl = event.notification.data?.url || "/";
+
   event.waitUntil(
-    clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
-      if (list.length > 0) return list[0].focus();
-      return clients.openWindow("/");
+    clients.matchAll({ type: "window", includeUncontrolled: true }).then((windowClients) => {
+      // 1. Try to find an existing window that is already loading the same origin
+      for (let i = 0; i < windowClients.length; i++) {
+        const client = windowClients[i];
+        if (client.url && "focus" in client) {
+          // Send message or navigate directly if possible
+          // For simple redirects, let's navigate the existing tab if it's on the home route
+          client.navigate(targetUrl);
+          return client.focus();
+        }
+      }
+      
+      // 2. If no window found, open a new one
+      if (clients.openWindow) {
+        return clients.openWindow(targetUrl);
+      }
     })
   );
 });

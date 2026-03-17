@@ -34,7 +34,7 @@ export function PostCard({
   initialCommentsExpanded = false,
   layout = 'feed'
 }: PostCardProps) {
-  const { onViewChange, userId: currentUserId, likedPostIds, savedPostIds, toggleLikedPost, toggleSavedPost, openLoginModal } = useUserData();
+  const { onViewChange, username, userId: currentUserId, likedPostIds, savedPostIds, toggleLikedPost, toggleSavedPost, openLoginModal } = useUserData();
   const { postId, author, content, title, likes, comments: initialComments, created_at: timestamp, category, user_id } = post;
 
   const [likeCount, setLikeCount] = useState(likes || 0);
@@ -59,6 +59,17 @@ export function PostCard({
       const { newLikes, isLiked: serverIsLiked } = await handleLikeUtil(postId, prevLikeCount, currentUserId);
       toggleLikedPost(postId, serverIsLiked);
       setLikeCount(newLikes);
+
+      if (serverIsLiked && !prevLiked && user_id !== currentUserId) {
+        const { triggerPushNotification } = await import("../utils/pushNotifications");
+        triggerPushNotification({
+          userId: user_id,
+          title: "❤️ New Like",
+          body: `${username || "Someone"} liked your post`,
+          url: `/?view=post&targetId=${postId}`,
+          type: "likes"
+        });
+      }
     } catch (error) {
       toggleLikedPost(postId, prevLiked);
       setLikeCount(prevLikeCount);

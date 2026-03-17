@@ -94,6 +94,18 @@ export function CommentSection({
     setSubmitting(true);
     try {
       await handleComment(postId, currentUserId, trimmed);
+      
+      if (postAuthorId && postAuthorId !== currentUserId) {
+        const { triggerPushNotification } = await import("../utils/pushNotifications");
+        triggerPushNotification({
+          userId: postAuthorId,
+          title: "💭 New Comment",
+          body: `${username || "Someone"} commented on your post`,
+          url: `/?view=post&targetId=${postId}&comments=true`,
+          type: "comments"
+        });
+      }
+
       setNewCommentContent("");
       await fetchComments();
       onCommentAdded();

@@ -713,3 +713,34 @@ create table bug_reports (
 
 alter table bug_reports enable row level security;
 create policy "Enable insert for everyone" on bug_reports for insert with check (true);
+
+
+-- ========================
+-- PUSH SUBSCRIPTIONS
+-- ========================
+create table push_subscriptions (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null,
+  endpoint text not null unique,
+  keys jsonb not null, -- { p256dh, auth }
+  device_info jsonb,
+  created_at timestamptz default now()
+);
+
+alter table push_subscriptions
+add constraint fk_push_subscriptions_user
+foreign key (user_id) references auth.users(id) on delete cascade;
+
+alter table push_subscriptions enable row level security;
+
+create policy "Users can manage own subscriptions" on push_subscriptions
+  for all to authenticated
+  using (user_id = auth.uid())
+  with check (user_id = auth.uid());
+
+
+-- ========================
+-- NOTIFICATION PREFERENCES
+-- ========================
+alter table profiles 
+add column if not exists notification_preferences jsonb default '{"chats": true, "replies": true, "follows": true, "likes": true, "buddies": true, "comments": true, "mentions": true}'::jsonb;
