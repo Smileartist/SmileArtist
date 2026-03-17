@@ -156,6 +156,15 @@ export function HomePage({ targetPostId }: { targetPostId?: string | null }) {
       {otherPosts.map((post, i) => (
         <PostCard key={`other-${i}`} post={post} />
       ))}
+
+      {/* Footer for Crawler validation */}
+      <footer className="mt-8 pt-6 border-t border-[var(--theme-primary)]/10 text-center text-xs text-[#8a7c74]/60">
+        <div className="flex justify-center items-center gap-4">
+          <a href="/?view=privacy" className="hover:text-[var(--theme-primary)] hover:underline transition-colors">Privacy Policy</a>
+          <span className="opacity-40">•</span>
+          <a href="/?view=terms" className="hover:text-[var(--theme-primary)] hover:underline transition-colors">Terms of Service</a>
+        </div>
+      </footer>
     </div>
   );
 }
